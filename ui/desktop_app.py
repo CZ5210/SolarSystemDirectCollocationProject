@@ -1,3 +1,6 @@
+import warnings
+warnings.filterwarnings("ignore", message="3d coordinates not supported yet", category=UserWarning)
+
 import tkinter as tk
 from tkinter import ttk, messagebox
 import matplotlib.pyplot as plt
@@ -6,6 +9,7 @@ import numpy as np
 from datetime import datetime
 import sys
 import os
+import mplcursors
 
 # 添加项目根目录到Python路径
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -29,6 +33,7 @@ class DesktopApp:
         self.current_view = None
         self.solar_system = None
         self.current_date = datetime.now()
+        self.cursors = []  # 存储光标对象列表
         
         # 第一步：创建所有 UI 控件（不依赖 core 模块）
         self._create_ui()
@@ -194,10 +199,17 @@ class DesktopApp:
                 self.canvas.draw()
                 self.canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
             else:
+                # 清理旧的光标对象
+                if hasattr(self, 'cursors') and self.cursors:
+                    for cursor in self.cursors:
+                        try:
+                            cursor.remove()
+                        except:
+                            pass
                 self.ax.clear()
             
             # 调用核心绘图函数
-            self.solar_system.plot_solar_system_enhanced(
+            _, _, self.cursors = self.solar_system.plot_solar_system_enhanced(
                 date.year, date.month, date.day, view_3d=True, ax=self.ax
             )
             
@@ -221,8 +233,18 @@ class DesktopApp:
 
     
     def on_motion(self, event):
-        """鼠标移动事件：显示星体悬浮提示"""
-        pass
+        """鼠标移动事件：移除悬停注解"""
+        # 当鼠标移动时，隐藏所有悬停注解
+        if event.inaxes:  # 鼠标在坐标轴内
+            if hasattr(self, 'cursors') and self.cursors:
+                for cursor in self.cursors:
+                    try:
+                        if cursor.selections:
+                            for sel in cursor.selections:
+                                if hasattr(sel, 'annotation') and sel.annotation:
+                                    sel.annotation.set_visible(False)
+                    except:
+                        pass
     
     def on_scroll(self, event):
         """鼠标滚轮缩放"""
@@ -250,6 +272,22 @@ class DesktopApp:
             self.ax.set_xlim(x_center - new_x_range/2, x_center + new_x_range/2)
             self.ax.set_ylim(y_center - new_y_range/2, y_center + new_y_range/2)
             self.ax.set_zlim(z_center - new_z_range/2, z_center + new_z_range/2)
+            
+            # 清除所有悬停注解
+            if hasattr(self, 'cursors') and self.cursors:
+                for i, cursor in enumerate(self.cursors):
+                    try:
+                        # 如果有活动选择，隐藏注解而不是调用remove()
+                        if cursor.selections:
+                            for sel in cursor.selections:
+                                if hasattr(sel, 'annotation') and sel.annotation:
+                                    sel.annotation.set_visible(False)
+                        else:
+                            # 没有活动选择，尝试调用remove()但可能会影响后续悬停
+                            # 暂时不调用remove，因为可能导致光标失效
+                            pass
+                    except Exception as e:
+                        print(f"[DEBUG] 光标 {i} 处理失败: {e}")
             
             if self.canvas:
                 self.canvas.draw()

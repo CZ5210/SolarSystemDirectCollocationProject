@@ -422,7 +422,7 @@ class TrajectoryOptimizer:
             # 绘制3D轨迹
             print("绘制3D轨迹...")
             # 首先绘制美化的太阳系作为背景
-            fig, ax = self.solar_system.plot_solar_system_enhanced(start_year, start_month, start_day, view_3d=True)
+            fig, ax, _ = self.solar_system.plot_solar_system_enhanced(start_year, start_month, start_day, view_3d=True)
             # 然后在这个ax上绘制轨迹
             departure_time_str = f"{start_year}-{start_month:02d}-{start_day:02d}"
             arrival_time_str = f"{int(end_year)}-{int(end_month):02d}-{int(end_day):02d}"

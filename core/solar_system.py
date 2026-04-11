@@ -2,6 +2,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
+import mplcursors
 
 # 设置支持中文的字体 
 plt.rcParams['font.sans-serif'] = ['SimHei']  # 使用黑体
@@ -351,120 +352,6 @@ class SolarSystem:
                 positions[body_name] = self.calculate_body_position(body_name, year, month, day)
         return positions
     
-    def plot_solar_system(self, year, month, day, plot_orbits=True, view_3d=False):
-        """
-        绘制给定日期的太阳系
-        :param year: 年份
-        :param month: 月份
-        :param day: 日期
-        :param plot_orbits: 是否绘制轨道
-        :param view_3d: 是否使用3D视图
-        """
-        # 计算所有星体位置
-        positions = self.calculate_all_bodies_positions(year, month, day)
-        
-        if view_3d:
-            fig = plt.figure(figsize=(12, 10))
-            ax = fig.add_subplot(111, projection='3d')
-        else:
-            fig, ax = plt.subplots(figsize=(12, 10))
-        
-        # 绘制轨道
-        if plot_orbits:
-            for body_name in self.bodies:
-                if body_name == "太阳":
-                    continue
-                
-                body = self.bodies[body_name]
-                a = body["a"]
-                e = body["e"]
-                i = np.radians(body["i"])
-                Omega = np.radians(body["Omega"])
-                omega = np.radians(body["omega"])
-                
-                # 生成轨道点
-                nu_list = np.linspace(0, 2*np.pi, 100)
-                
-                x_list = []
-                y_list = []
-                z_list = []
-                
-                for nu in nu_list:
-                    # 计算近心点经度：omega + nu
-                    longitude = omega + nu
-                    r = a * (1 - e**2) / (1 + e * np.cos(nu))
-                    x_orb = r * np.cos(longitude)
-                    y_orb = r * np.sin(longitude)
-                    z_orb = 0.0
-                    
-                    # 坐标变换：轨道平面 -> 黄道平面
-                    # 1. 绕x轴旋转-倾角i
-                    x1 = x_orb
-                    y1 = y_orb * np.cos(-i) - z_orb * np.sin(-i)
-                    z1 = y_orb * np.sin(-i) + z_orb * np.cos(-i)
-                    
-                    # 2. 绕z轴旋转升交点经度Omega
-                    x2 = x1 * np.cos(Omega) - y1 * np.sin(Omega)
-                    y2 = x1 * np.sin(Omega) + y1 * np.cos(Omega)
-                    z2 = z1
-                    
-                    x_list.append(x2)
-                    y_list.append(y2)
-                    z_list.append(z2)
-                
-                # 绘制轨道
-                color = body["color"]
-                if view_3d:
-                    ax.plot(x_list, y_list, z_list, color=color, alpha=0.3)
-                else:
-                    ax.plot(x_list, y_list, color=color, alpha=0.3)
-        
-        # 绘制星体
-        for body_name, (x, y, z) in positions.items():
-            body = self.bodies[body_name]
-            color = body["color"]
-            size = body["size"]
-            
-            if body_name == "太阳":
-                if view_3d:
-                    ax.scatter(x, y, z, color=color, s=200, label=body_name)
-                else:
-                    ax.scatter(x, y, color=color, s=200, label=body_name)
-            else:
-                if view_3d:
-                    ax.scatter(x, y, z, color=color, s=size*5, label=body_name)
-                else:
-                    ax.scatter(x, y, color=color, s=size*5, label=body_name)
-        
-        # 设置标题和标签
-        date_str = f"{year}-{month:02d}-{day:02d}"
-        plt.title(f"太阳系位置 ({date_str})")
-        
-        if view_3d:
-            ax.set_xlabel('X (AU)')
-            ax.set_ylabel('Y (AU)')
-            ax.set_zlabel('Z (AU)')
-        else:
-            ax.set_xlabel('X (AU)')
-            ax.set_ylabel('Y (AU)')
-            ax.grid(True, alpha=0.3)
-        
-        # 设置坐标轴范围
-        max_dist = 35  # AU，覆盖海王星轨道
-        if view_3d:
-            ax.set_xlim(-max_dist, max_dist)
-            ax.set_ylim(-max_dist, max_dist)
-            ax.set_zlim(-max_dist, max_dist)
-        else:
-            ax.set_xlim(-max_dist, max_dist)
-            ax.set_ylim(-max_dist, max_dist)
-            ax.set_aspect('equal')
-        
-        # 添加图例
-        plt.legend(loc='upper left')
-        
-        plt.tight_layout()
-        return fig, ax
     
     def plot_solar_system_enhanced(self, year, month, day, view_3d=True, ax=None):
         """
@@ -475,6 +362,9 @@ class SolarSystem:
         :param view_3d: 是否使用3D视图
         :param ax: 可选的matplotlib轴对象，如果提供则在该轴上绘制
         """
+        # 用于存储光标对象的列表
+        cursors = []
+        
         # 如果没有提供轴，则创建新的图形
         if ax is None:
             # 创建图形
@@ -524,10 +414,29 @@ class SolarSystem:
                 
                 # 绘制星体
                 if view_3d:
-                    ax.scatter(x, y, z, color=body["color"], s=body["size"]*2, label=body_name)
+                    scatter = ax.scatter(x, y, z, color=body["color"], s=body["size"]*2, label=body_name)
                 else:
-                    ax.scatter(x, y, color=body["color"], s=body["size"]*2, label=body_name)
+                    scatter = ax.scatter(x, y, color=body["color"], s=body["size"]*2, label=body_name)
                 
+                # 为散点添加光标悬停效果
+                cursor = mplcursors.cursor(scatter, hover=True)
+                cursors.append(cursor)
+                @cursor.connect("add")
+                def on_add(sel, name=body_name, body_data=body):
+                    # 构建提示信息
+                    # 左对齐文本
+                    info = f"{name}\n"
+                    info += f"半长轴: {body_data['a']:.3f} AU\n"
+                    info += f"偏心率: {body_data['e']:.3f}\n"
+                    info += f"轨道倾角: {body_data['i']:.2f}°\n"
+                    # 设置文本左对齐
+                    sel.annotation.set_ha('left')
+
+                    sel.annotation.set_text(info)
+                    sel.annotation.get_bbox_patch().set(fc="lightgray", ec="black", alpha=0.8)
+                
+
+
                 # 绘制轨道
                 a = body["a"]
                 e = body["e"]
@@ -576,9 +485,22 @@ class SolarSystem:
         
         # 绘制太阳
         if view_3d:
-            ax.scatter(0, 0, 0, color=self.bodies["太阳"]["color"], s=200, label="太阳")
+            sun_scatter = ax.scatter(0, 0, 0, color=self.bodies["太阳"]["color"], s=200, label="太阳")
         else:
-            ax.scatter(0, 0, color=self.bodies["太阳"]["color"], s=200, label="太阳")
+            sun_scatter = ax.scatter(0, 0, color=self.bodies["太阳"]["color"], s=200, label="太阳")
+        
+        # 为太阳添加光标悬停效果
+        sun_cursor = mplcursors.cursor(sun_scatter, hover=True)
+        cursors.append(sun_cursor)
+        @sun_cursor.connect("add")
+        def on_add_sun(sel):
+            body = self.bodies["太阳"]
+            info = f"太阳\n"
+            info += f"半径: {body['radius']*149597870.7:.0f} km\n"
+            info += f"质量：1.989e30 kg\n"
+            sel.annotation.set_ha('left')
+            sel.annotation.set_text(info)
+            sel.annotation.get_bbox_patch().set(fc="lightgray", ec="black", alpha=0.8)
         
         # 设置标题和标签
         time_str = f"{year}-{month:02d}-{day:02d}"
@@ -603,7 +525,7 @@ class SolarSystem:
         #     text.set_color('white')
         
         plt.tight_layout()
-        return return_fig, ax
+        return return_fig, ax, cursors
 
 if __name__ == "__main__":
     print("开始测试太阳系模型...")
@@ -613,7 +535,7 @@ if __name__ == "__main__":
         
         # 绘制美化的太阳系
         print("\n绘制美化的太阳系...")
-        fig, ax = solar_system.plot_solar_system_enhanced(2300, 1, 1, view_3d=True)
+        fig, ax, _ = solar_system.plot_solar_system_enhanced(2300, 1, 1, view_3d=True)
         plt.savefig('SolarSystem_Enhanced_3D.png', facecolor='black', dpi=300)
         print("美化的3D太阳系视图已保存为 SolarSystem_Enhanced_3D.png")
         
