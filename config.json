@@ -1,0 +1,41 @@
+{
+    "solar_system": {
+        "mu": 39.47841760435743,
+        "bodies": [
+            "太阳",
+            "水星",
+            "金星",
+            "地球",
+            "火星",
+            "木星",
+            "土星",
+            "天王星",
+            "海王星"
+        ]
+    },
+    "trajectory": {
+        "default_N": 50,
+        "default_rbound_factor": 0.5,
+        "max_iterations": 50,
+        "ftol": 1e-12
+    },
+    "visualization": {
+        "figure_size": [
+            14,
+            10
+        ],
+        "dpi": 300,
+        "default_view": "3D"
+    },
+    "porkchop": {
+        "default_start_year": 2300,
+        "default_end_year": 2350,
+        "default_tof_min": 1,
+        "default_tof_max": 10,
+        "default_N": 30
+    },
+    "output": {
+        "directory": "Output",
+        "porkchop_directory": "Output/PorkChop"
+    }
+}
