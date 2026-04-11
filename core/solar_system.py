@@ -465,34 +465,52 @@ class SolarSystem:
         plt.tight_layout()
         return fig, ax
     
-    def plot_solar_system_enhanced(self, year, month, day, view_3d=True):
+    def plot_solar_system_enhanced(self, year, month, day, view_3d=True, ax=None):
         """
         美化的太阳系绘制，添加太空环境效果
         :param year: 年份
         :param month: 月份
         :param day: 日期
         :param view_3d: 是否使用3D视图
+        :param ax: 可选的matplotlib轴对象，如果提供则在该轴上绘制
         """
-        # 创建图形
-        fig = plt.figure(figsize=(14, 10))
-        #关闭坐标轴
-        plt.axis('off')
-        #关闭网格
-        plt.grid(None)
-        
-        if view_3d:
-            ax = fig.add_subplot(111, projection='3d')
-            ax.set_facecolor('black')
-            fig.patch.set_facecolor('black')
-            ax.xaxis.set_pane_color((0.0, 0.0, 0.0, 0.0))
-            ax.yaxis.set_pane_color((0.0, 0.0, 0.0, 0.0))
-            ax.zaxis.set_pane_color((0.0, 0.0, 0.0, 0.0))
-            ax.grid(False)
+        # 如果没有提供轴，则创建新的图形
+        if ax is None:
+            # 创建图形
+            fig = plt.figure(figsize=(14, 10))
+            #关闭坐标轴
+            plt.axis('off')
+            #关闭网格
+            plt.grid(None)
+            
+            if view_3d:
+                ax = fig.add_subplot(111, projection='3d')
+                ax.set_facecolor('black')
+                fig.patch.set_facecolor('black')
+                ax.xaxis.set_pane_color((0.0, 0.0, 0.0, 0.0))
+                ax.yaxis.set_pane_color((0.0, 0.0, 0.0, 0.0))
+                ax.zaxis.set_pane_color((0.0, 0.0, 0.0, 0.0))
+                ax.grid(False)
+            else:
+                ax = fig.add_subplot(111)
+                ax.set_aspect('equal')
+                ax.set_facecolor('black')
+                fig.patch.set_facecolor('black')
+            return_fig = fig
         else:
-            ax = fig.add_subplot(111)
-            ax.set_aspect('equal')
-            ax.set_facecolor('black')
-            fig.patch.set_facecolor('black')
+            # 清除轴的内容
+            ax.clear()
+            # 设置轴的属性
+            if view_3d:
+                ax.set_facecolor('black')
+                ax.xaxis.set_pane_color((0.0, 0.0, 0.0, 0.0))
+                ax.yaxis.set_pane_color((0.0, 0.0, 0.0, 0.0))
+                ax.zaxis.set_pane_color((0.0, 0.0, 0.0, 0.0))
+                ax.grid(False)
+            else:
+                ax.set_aspect('equal')
+                ax.set_facecolor('black')
+            return_fig = ax.get_figure()
         
         # 计算并绘制每个星体
         for body_name, body in self.bodies.items():
@@ -578,13 +596,13 @@ class SolarSystem:
             ax.set_xlim(-max_dist, max_dist)
             ax.set_ylim(-max_dist, max_dist)
         
-        # 添加图例
-        legend = ax.legend(loc='upper left', fontsize=12)
-        for text in legend.get_texts():
-            text.set_color('white')
+        # 不添加图例
+        # legend = ax.legend(loc='upper left', fontsize=12)
+        # for text in legend.get_texts():
+        #     text.set_color('white')
         
         plt.tight_layout()
-        return fig, ax
+        return return_fig, ax
 
 if __name__ == "__main__":
     print("开始测试太阳系模型...")
