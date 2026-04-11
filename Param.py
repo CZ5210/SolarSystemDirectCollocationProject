@@ -31,3 +31,11 @@ CHART_CONFIG = {
     "legend_bg_color": "#2d2d2d",  # 图例背景颜色
     "text_color": "white"  # 文本颜色
 }
+
+# 时间参数配置
+TIME_CONFIG = {
+    "min_days": 0,  # 最小天数（只能前进）
+    "max_days": 365*5,  # 最大天数
+    "default_days": 0,  # 默认天数
+    "step": 10  # 步长
+}

@@ -1,3 +1,4 @@
+
 import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
@@ -478,10 +479,10 @@ class SolarSystem:
         if ax is None:
             # 创建图形
             fig = plt.figure(figsize=(14, 10))
-            #关闭坐标轴
-            plt.axis('off')
-            #关闭网格
-            plt.grid(None)
+            # #关闭坐标轴
+            # plt.axis('off')
+            # #关闭网格
+            # plt.grid(None)
             
             if view_3d:
                 ax = fig.add_subplot(111, projection='3d')
@@ -582,9 +583,9 @@ class SolarSystem:
         # 设置标题和标签
         time_str = f"{year}-{month:02d}-{day:02d}"
         if view_3d:
-            ax.set_title(f"太阳系 ({time_str}) - 3D视图", color='white', fontsize=16)
+            ax.set_title(f"太阳系 ({time_str})", color='white', fontsize=16)
         else:
-            ax.set_title(f"太阳系 ({time_str}) - 2D视图", color='white', fontsize=16)
+            ax.set_title(f"太阳系 ({time_str})", color='white', fontsize=16)
         
         # 设置坐标轴范围
         max_dist = 35  # AU，覆盖海王星轨道

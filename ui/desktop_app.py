@@ -10,6 +10,9 @@ import os
 # 添加项目根目录到Python路径
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+# 导入参数配置
+from Param import TIME_CONFIG
+
 class DesktopApp:
     """桌面应用类"""
     
@@ -63,17 +66,33 @@ class DesktopApp:
         
         # 时间滑块
         ttk.Label(self.control_frame, text="时间调整:", font=('Arial', 10, 'bold'), style="Dark.TLabel").pack(side=tk.LEFT, padx=10, pady=5)
-        self.time_slider = ttk.Scale(self.control_frame, from_=-365, to=365, orient=tk.HORIZONTAL, length=400, command=self.update_date, style="Dark.Horizontal.TScale")
-        self.time_slider.set(0)
+        self.time_slider = ttk.Scale(self.control_frame, from_=TIME_CONFIG["min_days"], to=TIME_CONFIG["max_days"], orient=tk.HORIZONTAL, length=400, command=self.update_date, style="Dark.Horizontal.TScale")
+        self.time_slider.set(TIME_CONFIG["default_days"])
         self.time_slider.pack(side=tk.LEFT, padx=10, pady=5)
         
         # 滑块值显示
         self.slider_value_var = tk.StringVar(value="0 天")
         ttk.Label(self.control_frame, textvariable=self.slider_value_var, font=('Arial', 10), style="Dark.TLabel").pack(side=tk.LEFT, padx=10, pady=5)
         
-        # 可视化框架
-        self.viz_frame = ttk.LabelFrame(self.main_frame, text="太阳系可视化", padding="10", style="Dark.TLabelframe")
-        self.viz_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        # 内容框架：左侧可视化，右侧面板
+        self.content_frame = ttk.Frame(self.main_frame, style="Dark.TFrame")
+        self.content_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        
+        # 使用 grid 布局来控制比例
+        self.content_frame.grid_columnconfigure(0, weight=1)  # 左侧占 1 份
+        self.content_frame.grid_columnconfigure(1, weight=1)  # 右侧占 1 份
+        self.content_frame.grid_rowconfigure(0, weight=1)
+        
+        # 左侧：太阳系可视化（保持1:1长宽比）
+        self.viz_frame = ttk.LabelFrame(self.content_frame, text="太阳系可视化", padding="10", style="Dark.TLabelframe")
+        self.viz_frame.grid(row=0, column=0, sticky=tk.NSEW, padx=(0, 10))
+        
+        # 右侧：空UI面板
+        self.right_panel = ttk.LabelFrame(self.content_frame, text="控制面板", padding="10", style="Dark.TLabelframe")
+        self.right_panel.grid(row=0, column=1, sticky=tk.NSEW, padx=(10, 0))
+        
+        # 在右侧面板添加一个占位标签
+        ttk.Label(self.right_panel, text="此处可添加控制元素", style="Dark.TLabel").pack(expand=True)
     
     def _init_core_module(self):
         """尝试导入并初始化 SolarSystem 模块"""
@@ -116,6 +135,13 @@ class DesktopApp:
         
         try:
             days = int(float(value))
+            # 确保时间只能前进，不能后退
+            current_days = int(self.time_slider.get())
+            if days < current_days:
+                # 如果尝试后退，保持当前值
+                self.time_slider.set(current_days)
+                return
+            
             adjusted_date = self.current_date.replace(hour=0, minute=0, second=0, microsecond=0)
             adjusted_date = adjusted_date.fromordinal(adjusted_date.toordinal() + days)
             
@@ -153,8 +179,15 @@ class DesktopApp:
                 if self.fig is not None:
                     plt.close(self.fig)
                 
-                self.fig = plt.figure(figsize=(20, 8), facecolor='black')
+                # 使用固定大小的 figure（10x10 英寸，1:1 长宽比）
+                self.fig = plt.figure(figsize=(10, 10), facecolor='black')
+                # 移除边距，让轴域填满整个 Figure
+                self.fig.subplots_adjust(left=0, right=1, top=1, bottom=0)
                 self.ax = self.fig.add_subplot(111, projection='3d')
+                # 关闭轴的裁剪，使轨道线即使在视图外也能完整绘制
+                self.ax.set_axis_off()  # 关闭坐标轴显示
+                # 设置 3D 轴的长宽比为 1:1:1，确保球体显示正确
+                self.ax.set_box_aspect((1, 1, 1))
                 self.fig.canvas.mpl_connect('scroll_event', self.on_scroll)
                 self.fig.canvas.mpl_connect('motion_notify_event', self.on_motion)
                 self.canvas = FigureCanvasTkAgg(self.fig, master=self.viz_frame)
@@ -185,8 +218,10 @@ class DesktopApp:
             self.canvas = None
             self.ax = None
     
+
+    
     def on_motion(self, event):
-        """鼠标移动事件（预留）"""
+        """鼠标移动事件：显示星体悬浮提示"""
         pass
     
     def on_scroll(self, event):
