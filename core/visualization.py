@@ -23,7 +23,7 @@ class Visualization:
         solution = np.loadtxt(filename, delimiter=',')
         return solution
     
-    def plot_trajectory_3d(self, s0, sf, r1, r2, N, solution, size=10, ax=None, dv=None, 
+    def plot_trajectory_3d(self, s0, sf, N, solution, size=10, ax=None, dv=None, 
                           departure_time=None, arrival_time=None, tof_years=None, 
                           departure_body=None, arrival_body=None):
         """
@@ -194,10 +194,10 @@ class Visualization:
         u_y = solution[7*N:8*N]
         u_z = solution[8*N:9*N]
 
-        # 将加速度从AU/year^2转换为km/s^2
-        u_x = u_x * (149597871 / ((365*24*3600)**2))
-        u_y = u_y * (149597871 / ((365*24*3600)**2))
-        u_z = u_z * (149597871 / ((365*24*3600)**2))
+        # 将加速度从AU/year^2转换为m/s^2
+        u_x = u_x * (149597871 / ((365*24*3600)**2))*1000
+        u_y = u_y * (149597871 / ((365*24*3600)**2))*1000
+        u_z = u_z * (149597871 / ((365*24*3600)**2))*1000
 
         t = np.linspace(0, TOF, N)
         # 将时间从年转化为月
@@ -209,7 +209,7 @@ class Visualization:
         # 绘制x方向控制输入
         ax1 = fig.add_subplot(411)
         ax1.plot(t, u_x, label='u_x', color='r')
-        ax1.set_ylabel(r'控制输入 ($km/s^2$)')
+        ax1.set_ylabel(r'控制输入 ($m/s^2$)')
         ax1.set_title('x方向控制输入')
         ax1.grid()
         ax1.legend()
@@ -217,7 +217,7 @@ class Visualization:
         # 绘制y方向控制输入
         ax2 = fig.add_subplot(412)
         ax2.plot(t, u_y, label='u_y', color='g')
-        ax2.set_ylabel(r'控制输入 ($km/s^2$)')
+        ax2.set_ylabel(r'控制输入 ($m/s^2$)')
         ax2.set_title('y方向控制输入')
         ax2.grid()
         ax2.legend()
@@ -225,7 +225,7 @@ class Visualization:
         # 绘制z方向控制输入
         ax3 = fig.add_subplot(413)
         ax3.plot(t, u_z, label='u_z', color='b')
-        ax3.set_ylabel(r'控制输入 ($km/s^2$)')
+        ax3.set_ylabel(r'控制输入 ($m/s^2$)')
         ax3.set_title('z方向控制输入')
         ax3.grid()
         ax3.legend()
@@ -235,7 +235,7 @@ class Visualization:
         u_mag = np.sqrt(u_x**2 + u_y**2 + u_z**2)
         ax4.plot(t, u_mag, label='控制输入模', color='purple')
         ax4.set_xlabel('时间(月)')
-        ax4.set_ylabel(r'控制输入模 ($km/s^2$)')
+        ax4.set_ylabel(r'控制输入模 ($m/s^2$)')
         ax4.set_title('3D控制输入模时间历史')
         ax4.grid()
         ax4.legend()

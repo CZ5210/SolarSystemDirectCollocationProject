@@ -14,7 +14,7 @@ class OrbitPlanner:
         self.visualization = Visualization()
     
     def plan_orbit(self, start_year, start_month, start_day, tof_years, 
-                   departure_body, arrival_body, N=100, rbound_factor=0.9, 
+                   departure_body, arrival_body, N=20, rbound=0.1, 
                    thrust_limit=None, plot=True, output_dir="Output"):
         """
         规划轨道
@@ -25,9 +25,9 @@ class OrbitPlanner:
         :param tof_years: 飞行时间（年）
         :param departure_body: 出发星体名称
         :param arrival_body: 到达星体名称
-        :param N: 网格数（默认100）
-        :param rbound_factor: 半径边界因子（默认0.9）
-        :param thrust_limit: 推力加速度限制 (AU/year²)（默认None）
+        :param N: 网格数（默认20）
+        :param rbound: 最小太阳距离 (AU)（默认0.1）
+        :param thrust_limit: 推力加速度限制 (m/s²)（默认None）
         :param plot: 是否绘制结果（默认True）
         :param output_dir: 输出目录（默认"Output"）
         :return: 速度增量 (km/s)
@@ -36,8 +36,19 @@ class OrbitPlanner:
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
         
+        # 保存原始推力限制值（m/s²）
+        original_thrust_limit = thrust_limit
+        
+        # 单位转换：m/s² 到 AU/year²
+        if thrust_limit is not None:
+            # 1 AU = 149597871 km = 149597871000 m
+            # 1 year = 365.25 * 24 * 3600 seconds
+            au_per_m = 1 / 149597871000
+            seconds_per_year = 365.25 * 24 * 3600
+            thrust_limit = thrust_limit * au_per_m * (seconds_per_year ** 2)
+        
         # 生成文件名
-        file_name = f"{output_dir}/{departure_body}_to_{arrival_body}_{start_year}{start_month:02d}{start_day:02d}_{tof_years}y.csv"
+        file_name = f"{output_dir}/{departure_body}到{arrival_body}_{start_year}{start_month:02d}{start_day:02d}.csv"
         
         # 构建轨迹规划参数
         params = {
@@ -50,12 +61,33 @@ class OrbitPlanner:
             'departure_body': departure_body,
             'arrival_body': arrival_body,
             'N': N,
-            'rbound_factor': rbound_factor,
+            'rbound': rbound,
             'thrust_limit': thrust_limit
         }
         
         # 计算轨迹
         dv = self.optimizer.real_solar_system_trajectory(params)
+        
+        # 检查推力约束（使用原始m/s²值）
+        if original_thrust_limit is not None:
+            from features.constraints import Constraints
+            constraints = Constraints()
+            # 读取优化结果
+            solution = np.loadtxt(file_name, delimiter=',')
+            # 检查推力约束
+            is_valid, max_thrust = constraints.check_thrust_constraint(solution, original_thrust_limit)
+            if not is_valid:
+                print(f"警告：推力约束不满足！最大推力为 {max_thrust:.6f} m/s²，超过限制 {original_thrust_limit:.6f} m/s²")
+        
+        # 检查太阳距离约束
+        from features.constraints import Constraints
+        constraints = Constraints()
+        # 读取优化结果
+        solution = np.loadtxt(file_name, delimiter=',')
+        # 检查太阳距离约束
+        is_valid, min_distance = constraints.check_sun_distance_constraint(solution, rbound)
+        if not is_valid:
+            print(f"警告：太阳距离约束不满足！最小距离为 {min_distance:.6f} AU，低于限制 {rbound:.6f} AU")
         
         return dv
     

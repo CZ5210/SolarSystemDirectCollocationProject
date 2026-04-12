@@ -9,13 +9,36 @@ import numpy as np
 from datetime import datetime
 import sys
 import os
+import shutil
 import mplcursors
+import threading
+import queue
+
+# 自定义stdout重定向类
+class TextRedirector:
+    def __init__(self, text_widget, queue):
+        self.text_widget = text_widget
+        self.queue = queue
+        self.old_stdout = sys.stdout
+    
+    def write(self, string):
+        self.queue.put(string)
+    
+    def flush(self):
+        pass
+    
+    def __enter__(self):
+        sys.stdout = self
+        return self
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        sys.stdout = self.old_stdout
 
 # 添加项目根目录到Python路径
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # 导入参数配置
-from Param import TIME_CONFIG
+from Param import TIME_CONFIG, OUTPUT_CONFIG
 
 class DesktopApp:
     """桌面应用类"""
@@ -23,7 +46,7 @@ class DesktopApp:
     def __init__(self, root):
         self.root = root
         self.root.title("太阳系轨道设计工具")
-        self.root.geometry("1400x800")
+        self.root.geometry("1400x1000")
         self.root.configure(bg="#2d2d2d")
         
         # 初始化所有属性（避免 AttributeError）
@@ -35,15 +58,65 @@ class DesktopApp:
         self.current_date = datetime.now()
         self.cursors = []  # 存储光标对象列表
         self._updating_from_slider = False  # 用于避免循环更新
+        self.output_queue = queue.Queue()  # 用于线程间通信的队列
         
-        # 第一步：创建所有 UI 控件（不依赖 core 模块）
+        # 第一步：清理输出目录
+        self._clean_output_directory()
+        
+        # 第二步：创建所有 UI 控件（不依赖 core 模块）
         self._create_ui()
         
-        # 第二步：设置窗口关闭时的资源清理回调
+        # 第三步：设置窗口关闭时的资源清理回调
         self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
         
-        # 第三步：尝试加载核心模块
+        # 第四步：启动输出队列处理
+        self.root.after(100, self.process_queue)
+        
+        # 第五步：尝试加载核心模块
         self._init_core_module()
+    
+    def _clean_output_directory(self):
+        """清理输出目录"""
+        try:
+            output_dir = OUTPUT_CONFIG["directory"]
+            if os.path.exists(output_dir):
+                # 移除目录及其所有内容
+                shutil.rmtree(output_dir)
+                print(f"已清理输出目录: {output_dir}")
+            # 重新创建目录结构
+            os.makedirs(output_dir, exist_ok=True)
+            porkchop_dir = OUTPUT_CONFIG["porkchop_directory"]
+            os.makedirs(porkchop_dir, exist_ok=True)
+            print(f"已创建输出目录结构")
+        except Exception as e:
+            print(f"清理输出目录时出错: {e}")
+    
+    def toggle_log(self):
+        """折叠/展开日志面板"""
+        if self.log_collapsed:
+            # 展开日志
+            self.log_frame.grid()
+            self.log_toggle_button.config(text="折叠日志")
+            self.log_collapsed = False
+        else:
+            # 折叠日志
+            self.log_frame.grid_remove()
+            self.log_toggle_button.config(text="展开日志")
+            self.log_collapsed = True
+    
+    def process_queue(self):
+        """处理输出队列，实时更新日志文本框"""
+        try:
+            while True:
+                string = self.output_queue.get_nowait()
+                self.log_text.insert(tk.END, string)
+                self.log_text.see(tk.END)
+                self.root.update_idletasks()
+        except queue.Empty:
+            pass
+        finally:
+            # 每隔100毫秒检查一次队列
+            self.root.after(100, self.process_queue)
     
     def _create_ui(self):
         """创建所有界面控件（必须在任何可能失败的操作之前执行）"""
@@ -164,18 +237,18 @@ class DesktopApp:
         ttk.Label(self.right_panel, text="规划参数", font=('Arial', 10, 'bold'), style="Dark.TLabel").grid(row=8, column=0, columnspan=2, sticky=tk.W, pady=(10, 5))
         # 网格数
         ttk.Label(self.right_panel, text="网格数 (N):", style="Dark.TLabel").grid(row=9, column=0, sticky=tk.W, padx=(10, 5))
-        self.N_var = tk.StringVar(value="100")
+        self.N_var = tk.StringVar(value="20")
         self.N_entry = ttk.Entry(self.right_panel, textvariable=self.N_var, width=10)
         self.N_entry.grid(row=9, column=1, sticky=tk.W, pady=2)
 
-        # 半径边界因子
-        ttk.Label(self.right_panel, text="半径边界因子:", style="Dark.TLabel").grid(row=10, column=0, sticky=tk.W, padx=(10, 5))
-        self.rbound_var = tk.StringVar(value="0.9")
+        # 最小太阳距离 (AU)
+        ttk.Label(self.right_panel, text="最小太阳距离 (AU):", style="Dark.TLabel").grid(row=10, column=0, sticky=tk.W, padx=(10, 5))
+        self.rbound_var = tk.StringVar(value="0.1")
         self.rbound_entry = ttk.Entry(self.right_panel, textvariable=self.rbound_var, width=10)
         self.rbound_entry.grid(row=10, column=1, sticky=tk.W, pady=2)
 
         # 推力限制（可选）
-        ttk.Label(self.right_panel, text="推力限制 (AU/year²):", style="Dark.TLabel").grid(row=11, column=0, sticky=tk.W, padx=(10, 5), pady=(10, 5))
+        ttk.Label(self.right_panel, text="推力限制 (m/s²):", style="Dark.TLabel").grid(row=11, column=0, sticky=tk.W, padx=(10, 5), pady=(10, 5))
         self.thrust_var = tk.StringVar(value="")
         self.thrust_entry = ttk.Entry(self.right_panel, textvariable=self.thrust_var, width=10)
         self.thrust_entry.grid(row=11, column=1, sticky=tk.W, pady=(10, 5))
@@ -188,6 +261,29 @@ class DesktopApp:
         self.status_var = tk.StringVar(value="")
         self.status_label = ttk.Label(self.right_panel, textvariable=self.status_var, style="Dark.TLabel", foreground="lightgreen")
         self.status_label.grid(row=13, column=0, columnspan=2, pady=5)
+
+        # 输出日志面板
+        ttk.Label(self.right_panel, text="计算日志", font=('Arial', 10, 'bold'), style="Dark.TLabel").grid(row=14, column=0, columnspan=2, sticky=tk.W, pady=(10, 5))
+        
+        # 日志面板框架
+        self.log_frame = ttk.LabelFrame(self.right_panel, padding="5", style="Dark.TLabelframe")
+        self.log_frame.grid(row=15, column=0, columnspan=2, sticky=tk.NSEW, pady=5)
+        self.log_frame.grid_columnconfigure(0, weight=1)
+        self.log_frame.grid_rowconfigure(0, weight=1)
+        
+        # 日志文本框
+        self.log_text = tk.Text(self.log_frame, height=10, wrap=tk.WORD, bg="#1e1e1e", fg="white", font=('Consolas', 9))
+        self.log_text.grid(row=0, column=0, sticky=tk.NSEW)
+        
+        # 滚动条
+        scrollbar = ttk.Scrollbar(self.log_frame, command=self.log_text.yview)
+        scrollbar.grid(row=0, column=1, sticky=tk.NS)
+        self.log_text.config(yscrollcommand=scrollbar.set)
+        
+        # 日志折叠/展开按钮
+        self.log_collapsed = False
+        self.log_toggle_button = ttk.Button(self.right_panel, text="折叠日志", command=self.toggle_log, style="Dark.TButton")
+        self.log_toggle_button.grid(row=16, column=0, columnspan=2, pady=5)
 
         # 初始化行星列表（稍后在_init_core_module中填充）
         self.planet_list = []
@@ -327,6 +423,8 @@ class DesktopApp:
         """计算轨迹按钮回调函数"""
         # 先清除状态
         self.status_var.set("正在计算...")
+        # 清空日志
+        self.log_text.delete(1.0, tk.END)
         self.root.update_idletasks()
         
         try:
@@ -338,7 +436,7 @@ class DesktopApp:
             departure = self.departure_var.get()
             arrival = self.arrival_var.get()
             N = int(self.N_var.get())
-            rbound_factor = float(self.rbound_var.get())
+            rbound = float(self.rbound_var.get())
             thrust_str = self.thrust_var.get().strip()
             thrust_limit = float(thrust_str) if thrust_str else None
             
@@ -357,36 +455,56 @@ class DesktopApp:
                 self.status_var.set(f"输入错误: {message}")
                 return
             
-            # 计算轨迹（设置plot=False，避免弹出窗口）
-            dv = planner.plan_orbit(
-                start_year=year,
-                start_month=month,
-                start_day=day,
-                tof_years=tof_years,
-                departure_body=departure,
-                arrival_body=arrival,
-                N=N,
-                rbound_factor=rbound_factor,
-                thrust_limit=thrust_limit,
-                plot=False,  # 不弹出窗口
-                output_dir="Output"
-            )
+            # 定义计算函数（用于线程执行）
+            def calculate():
+                try:
+                    # 重定向stdout到日志文本框
+                    with TextRedirector(self.log_text, self.output_queue):
+                        # 计算轨迹（设置plot=False，避免弹出窗口）
+                        dv = planner.plan_orbit(
+                            start_year=year,
+                            start_month=month,
+                            start_day=day,
+                            tof_years=tof_years,
+                            departure_body=departure,
+                            arrival_body=arrival,
+                            N=N,
+                            rbound=rbound,
+                            thrust_limit=thrust_limit,
+                            plot=False,  # 不弹出窗口
+                            output_dir=OUTPUT_CONFIG["directory"]
+                        )
+                    
+                    # 计算完成后更新UI（必须在主线程中执行）
+                    def update_ui():
+                        # 显示结果
+                        self.status_var.set(f"计算完成！速度增量: {dv:.4f} km/s")
+                        
+                        # 更新结果框架的关键数据
+                        self.dv_var.set(f"ΔV: {dv:.4f} km/s")
+                        # 暂时使用占位符最大推力加速度（需要从orbit_planner获取）
+                        max_thrust_accel = 0.001  # 占位符
+                        self.max_thrust_accel_var.set(f"最大推力加速度: {max_thrust_accel:.6f} AU/year²")
+                        
+                        # 切换到结果选项卡
+                        self.notebook.select(1)  # 第二个选项卡
+                        
+                        # 更新轨迹图和推力曲线
+                        self._update_trajectory_plot()
+                        self._update_thrust_plots()
+                    
+                    # 在主线程中执行UI更新
+                    self.root.after(0, update_ui)
+                    
+                except Exception as e:
+                    def update_error():
+                        self.status_var.set(f"计算过程中出错: {e}")
+                    self.root.after(0, update_error)
             
-            # 显示结果
-            self.status_var.set(f"计算完成！速度增量: {dv:.4f} km/s")
-            
-            # 更新结果框架的关键数据
-            self.dv_var.set(f"ΔV: {dv:.4f} km/s")
-            # 暂时使用占位符最大推力加速度（需要从orbit_planner获取）
-            max_thrust_accel = 0.001  # 占位符
-            self.max_thrust_accel_var.set(f"最大推力加速度: {max_thrust_accel:.6f} AU/year²")
-            
-            # 切换到结果选项卡
-            self.notebook.select(1)  # 第二个选项卡
-            
-            # 更新轨迹图和推力曲线（稍后实现）
-            self._update_trajectory_plot()
-            self._update_thrust_plots()
+            # 启动线程执行计算
+            thread = threading.Thread(target=calculate)
+            thread.daemon = True  # 守护线程，主线程退出时自动退出
+            thread.start()
             
         except ValueError as e:
             self.status_var.set(f"输入格式错误: {e}")
@@ -412,7 +530,7 @@ class DesktopApp:
             arrival = self.arrival_var.get()
             
             # 生成文件名（与plan_orbit方法一致）
-            file_name = f"Output/{departure}_to_{arrival}_{year}{month:02d}{day:02d}_{tof_years}y.csv"
+            file_name = f"{OUTPUT_CONFIG['directory']}/{departure}到{arrival}_{year}{month:02d}{day:02d}.csv"
             
             # 检查文件是否存在
             import os
@@ -526,10 +644,6 @@ class DesktopApp:
             x_traj, y_traj, z_traj, ux, uy, uz, N = self.trajectory_data
             departure, arrival, year, month, day, tof_years = self.trajectory_params
             
-            # 计算当前时间点
-            current_idx = int(progress * (N-1))
-            current_idx = max(0, min(N-1, current_idx))
-            
             # 计算当前时间（儒略日）
             from core.solar_system import SolarSystem
             solar_system = SolarSystem()
@@ -540,89 +654,148 @@ class DesktopApp:
             # 计算当前日期
             current_year, current_month, current_day = solar_system.julian_day_to_date(current_jd)
             
-            # 清除现有图形
-            if self.trajectory_canvas:
-                self.trajectory_canvas.get_tk_widget().destroy()
-                plt.close(self.trajectory_fig)
+            # 使用线性插值计算当前航天器位置和推力
+            import numpy as np
+            from scipy.interpolate import interp1d
             
-            # 创建3D图形
+            # 生成时间点数组（0到1）
+            t = np.linspace(0, 1, N)
             
-            self.trajectory_fig = plt.figure(figsize=(8, 6), facecolor='black')
-            # 移除边距，让轴域填满整个 Figure
-            self.trajectory_fig.subplots_adjust(left=0, right=1, top=1, bottom=0)
-            self.trajectory_ax = self.trajectory_fig.add_subplot(111, projection='3d')
-            # 关闭坐标轴显示
-            self.trajectory_ax.set_axis_off()
-            # 设置 3D 轴的长宽比为 1:1:1，确保球体显示正确
-            self.trajectory_ax.set_box_aspect((1, 1, 1))
-            # 添加鼠标缩放和拖动功能
-            self.trajectory_fig.canvas.mpl_connect('scroll_event', self.on_scroll)
-            self.trajectory_fig.canvas.mpl_connect('motion_notify_event', self.on_motion)
+            # 创建插值函数
+            interp_x = interp1d(t, x_traj, kind='linear')
+            interp_y = interp1d(t, y_traj, kind='linear')
+            interp_z = interp1d(t, z_traj, kind='linear')
+            interp_ux = interp1d(t, ux, kind='linear')
+            interp_uy = interp1d(t, uy, kind='linear')
+            interp_uz = interp1d(t, uz, kind='linear')
             
-            # 绘制美化的太阳系作为背景（当前时间）
-            # 保存轨迹图的cursor
-            _, _, self.trajectory_cursors = solar_system.plot_solar_system_enhanced(int(current_year), int(current_month), int(current_day), view_3d=True, ax=self.trajectory_ax)
+            # 计算当前位置和推力
+            current_x = interp_x(progress)
+            current_y = interp_y(progress)
+            current_z = interp_z(progress)
+            current_ux = interp_ux(progress)
+            current_uy = interp_uy(progress)
+            current_uz = interp_uz(progress)
             
-            # 绘制轨迹
-            self.trajectory_ax.plot(x_traj, y_traj, z_traj, 'b-', linewidth=2, label='转移轨迹')
-            
-            # 绘制推力方向（控制输入）
-            skip = max(1, N // 20)
-            self.trajectory_ax.quiver(x_traj[::skip], y_traj[::skip], z_traj[::skip], 
-                                     ux[::skip], uy[::skip], uz[::skip], 
-                                     color='orange', length=0.1, normalize=True, label='推力方向')
-            
-            # 绘制出发点和到达点
-            self.trajectory_ax.scatter([x_traj[0]], [y_traj[0]], [z_traj[0]], 
-                                     color='green', marker='o', s=50, label='出发点')
-            self.trajectory_ax.scatter([x_traj[-1]], [y_traj[-1]], [z_traj[-1]], 
-                                     color='red', marker='o', s=50, label='到达点')
-            
-            # 绘制当前航天器位置
-            self.trajectory_ax.scatter([x_traj[current_idx]], [y_traj[current_idx]], [z_traj[current_idx]], 
-                                     color='cyan', marker='*', s=100, label='当前位置')
-            
-            # 绘制当前推力方向
-            self.trajectory_ax.quiver([x_traj[current_idx]], [y_traj[current_idx]], [z_traj[current_idx]], 
-                                     [ux[current_idx]], [uy[current_idx]], [uz[current_idx]], 
-                                     color='yellow', length=0.2, normalize=True, label='当前推力')
-            
-            # 设置标题
-            self.trajectory_ax.set_title(f'{departure}到{arrival}的转移轨迹\n当前时间: {int(current_year)}-{int(current_month):02d}-{int(current_day):02d}', color='white')
-            
-            # 添加图例
-            # self.trajectory_ax.legend(facecolor='#2d2d2d', edgecolor='white', labelcolor='white')
-            
-            # 设置坐标轴范围
-            max_range = max(np.max(np.abs(x_traj)), np.max(np.abs(y_traj)), np.max(np.abs(z_traj)))
-            self.trajectory_ax.set_xlim([-max_range, max_range])
-            self.trajectory_ax.set_ylim([-max_range, max_range])
-            self.trajectory_ax.set_zlim([-max_range, max_range])
-            
-            self.trajectory_ax.set_aspect('equal')
-            
-            # 嵌入到tkinter
-            self.trajectory_canvas = FigureCanvasTkAgg(self.trajectory_fig, self.trajectory_frame)
-            self.trajectory_canvas.draw()
-            self.trajectory_canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+            # 检查是否已经有画布
+            if self.trajectory_ax is not None:
+                # 清除旧的内容
+                if hasattr(self, 'trajectory_cursors') and self.trajectory_cursors:
+                    for cursor in self.trajectory_cursors:
+                        try:
+                            cursor.remove()
+                        except:
+                            pass
+                self.trajectory_ax.clear()
+                
+                # 关闭坐标轴显示
+                self.trajectory_ax.set_axis_off()
+                # 设置 3D 轴的长宽比为 1:1:1，确保球体显示正确
+                self.trajectory_ax.set_box_aspect((1, 1, 1))
+                
+                # 绘制美化的太阳系作为背景（当前时间）
+                # 保存轨迹图的cursor
+                _, _, self.trajectory_cursors = solar_system.plot_solar_system_enhanced(int(current_year), int(current_month), int(current_day), view_3d=True, ax=self.trajectory_ax)
+                
+                # 绘制轨迹
+                self.trajectory_ax.plot(x_traj, y_traj, z_traj, 'b-', linewidth=2, label='转移轨迹')
+                
+                # 绘制推力方向（控制输入）
+                skip = max(1, N // 20)
+                self.trajectory_ax.quiver(x_traj[::skip], y_traj[::skip], z_traj[::skip], 
+                                         ux[::skip], uy[::skip], uz[::skip], 
+                                         color='orange', length=0.1, normalize=True, label='推力方向')
+                
+                # 绘制出发点和到达点
+                self.trajectory_ax.scatter([x_traj[0]], [y_traj[0]], [z_traj[0]], 
+                                         color='green', marker='o', s=50, label='出发点')
+                self.trajectory_ax.scatter([x_traj[-1]], [y_traj[-1]], [z_traj[-1]], 
+                                         color='red', marker='o', s=50, label='到达点')
+                
+                # 绘制当前航天器位置（使用插值后的位置）
+                self.trajectory_ax.scatter([current_x], [current_y], [current_z], 
+                                         color='cyan', marker='*', s=100, label='当前位置')
+                
+                # 绘制当前推力方向（使用插值后的推力）
+                self.trajectory_ax.quiver([current_x], [current_y], [current_z], 
+                                         [current_ux], [current_uy], [current_uz], 
+                                         color='yellow', length=0.2, normalize=True, label='当前推力')
+                
+                # 设置标题
+                self.trajectory_ax.set_title(f'{departure}到{arrival}的转移轨迹\n当前时间: {int(current_year)}-{int(current_month):02d}-{int(current_day):02d}', color='white')
+                
+                # 设置坐标轴范围
+                max_range = max(np.max(np.abs(x_traj)), np.max(np.abs(y_traj)), np.max(np.abs(z_traj)))
+                self.trajectory_ax.set_xlim([-max_range, max_range])
+                self.trajectory_ax.set_ylim([-max_range, max_range])
+                self.trajectory_ax.set_zlim([-max_range, max_range])
+                
+                self.trajectory_ax.set_aspect('equal')
+                
+                # 刷新画布
+                if self.trajectory_canvas:
+                    self.trajectory_canvas.draw()
+            else:
+                # 如果没有画布，创建新的（首次运行时）
+                # 创建3D图形
+                self.trajectory_fig = plt.figure(figsize=(8, 6), facecolor='black')
+                # 移除边距，让轴域填满整个 Figure
+                self.trajectory_fig.subplots_adjust(left=0, right=1, top=1, bottom=0)
+                self.trajectory_ax = self.trajectory_fig.add_subplot(111, projection='3d')
+                # 关闭坐标轴显示
+                self.trajectory_ax.set_axis_off()
+                # 设置 3D 轴的长宽比为 1:1:1，确保球体显示正确
+                self.trajectory_ax.set_box_aspect((1, 1, 1))
+                # 添加鼠标缩放和拖动功能
+                self.trajectory_fig.canvas.mpl_connect('scroll_event', self.on_scroll)
+                self.trajectory_fig.canvas.mpl_connect('motion_notify_event', self.on_motion)
+                
+                # 绘制美化的太阳系作为背景（当前时间）
+                # 保存轨迹图的cursor
+                _, _, self.trajectory_cursors = solar_system.plot_solar_system_enhanced(int(current_year), int(current_month), int(current_day), view_3d=True, ax=self.trajectory_ax)
+                
+                # 绘制轨迹
+                self.trajectory_ax.plot(x_traj, y_traj, z_traj, 'b-', linewidth=2, label='转移轨迹')
+                
+                # 绘制推力方向（控制输入）
+                skip = max(1, N // 20)
+                self.trajectory_ax.quiver(x_traj[::skip], y_traj[::skip], z_traj[::skip], 
+                                         ux[::skip], uy[::skip], uz[::skip], 
+                                         color='orange', length=0.1, normalize=True, label='推力方向')
+                
+                # 绘制出发点和到达点
+                self.trajectory_ax.scatter([x_traj[0]], [y_traj[0]], [z_traj[0]], 
+                                         color='green', marker='o', s=50, label='出发点')
+                self.trajectory_ax.scatter([x_traj[-1]], [y_traj[-1]], [z_traj[-1]], 
+                                         color='red', marker='o', s=50, label='到达点')
+                
+                # 绘制当前航天器位置（使用插值后的位置）
+                self.trajectory_ax.scatter([current_x], [current_y], [current_z], 
+                                         color='cyan', marker='*', s=100, label='当前位置')
+                
+                # 绘制当前推力方向（使用插值后的推力）
+                self.trajectory_ax.quiver([current_x], [current_y], [current_z], 
+                                         [current_ux], [current_uy], [current_uz], 
+                                         color='yellow', length=0.2, normalize=True, label='当前推力')
+                
+                # 设置标题
+                self.trajectory_ax.set_title(f'{departure}到{arrival}的转移轨迹\n当前时间: {int(current_year)}-{int(current_month):02d}-{int(current_day):02d}', color='white')
+                
+                # 设置坐标轴范围
+                max_range = max(np.max(np.abs(x_traj)), np.max(np.abs(y_traj)), np.max(np.abs(z_traj)))
+                self.trajectory_ax.set_xlim([-max_range, max_range])
+                self.trajectory_ax.set_ylim([-max_range, max_range])
+                self.trajectory_ax.set_zlim([-max_range, max_range])
+                
+                self.trajectory_ax.set_aspect('equal')
+                
+                # 嵌入到tkinter
+                self.trajectory_canvas = FigureCanvasTkAgg(self.trajectory_fig, self.trajectory_frame)
+                self.trajectory_canvas.draw()
+                self.trajectory_canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
             
         except Exception as e:
             print(f"更新轨迹时间轴时出错: {e}")
-    
-    def _update_trajectory_placeholder(self):
-        """使用占位符数据更新轨迹图"""
-        # 创建新图形
-        self.trajectory_fig = plt.figure(figsize=(8, 6), facecolor='black')
-        # 移除边距，让轴域填满整个 Figure
-        self.trajectory_fig.subplots_adjust(left=0, right=1, top=1, bottom=0)
-        self.trajectory_ax = self.trajectory_fig.add_subplot(111, projection='3d')
-        # 关闭坐标轴显示
-        self.trajectory_ax.set_axis_off()
-        # 设置 3D 轴的长宽比为 1:1:1，确保球体显示正确
-        self.trajectory_ax.set_box_aspect((1, 1, 1))
-        # 添加鼠标缩放和拖动功能
-        self.trajectory_fig.canvas.mpl_connect('scroll_event', self.on_scroll)
-        self.trajectory_fig.canvas.mpl_connect('motion_notify_event', self.on_motion)
         
     
     def _update_thrust_plots(self, thrust_data=None):
@@ -642,7 +815,7 @@ class DesktopApp:
             arrival = self.arrival_var.get()
             
             # 生成文件名（与plan_orbit方法一致）
-            file_name = f"Output/{departure}_to_{arrival}_{year}{month:02d}{day:02d}_{tof_years}y.csv"
+            file_name = f"{OUTPUT_CONFIG['directory']}/{departure}到{arrival}_{year}{month:02d}{day:02d}.csv"
             
             # 检查文件是否存在
             import os
@@ -660,6 +833,11 @@ class DesktopApp:
             ux = solution[6*N:7*N]  # X方向推力
             uy = solution[7*N:8*N]  # Y方向推力
             uz = solution[8*N:9*N]  # Z方向推力
+
+            # 将加速度从AU/year^2转换为m/s^2
+            ux = ux * (149597871 / ((365*24*3600)**2))*1000
+            uy = uy * (149597871 / ((365*24*3600)**2))*1000
+            uz = uz * (149597871 / ((365*24*3600)**2))*1000
             
             # 计算总推力
             thrust_mag = np.sqrt(ux**2 + uy**2 + uz**2)
@@ -672,7 +850,7 @@ class DesktopApp:
             
             # 计算最大推力加速度
             max_thrust_accel = np.max(thrust_mag)
-            self.max_thrust_accel_var.set(f"最大推力加速度: {max_thrust_accel:.6f} AU/year²")
+            self.max_thrust_accel_var.set(f"最大推力加速度: {max_thrust_accel:.6f} m/s^2")
             
             # 创建包含4个子图的图形（4行1列）
             self.thrust_fig, self.thrust_axes = plt.subplots(4, 1, figsize=(6, 10))
@@ -682,8 +860,7 @@ class DesktopApp:
             ax1 = self.thrust_axes[0]
             ax1.set_facecolor('#2d2d2d')
             ax1.plot(t, ux, 'r-', linewidth=2)
-            ax1.set_xlabel('时间 (天)', color='white')
-            ax1.set_ylabel('推力 X (AU/year²)', color='white')
+            ax1.set_ylabel(r'推力 X $m/s^2$', color='white')
             ax1.tick_params(colors='white')
             ax1.grid(True, alpha=0.3)
             
@@ -691,8 +868,7 @@ class DesktopApp:
             ax2 = self.thrust_axes[1]
             ax2.set_facecolor('#2d2d2d')
             ax2.plot(t, uy, 'g-', linewidth=2)
-            ax2.set_xlabel('时间 (天)', color='white')
-            ax2.set_ylabel('推力 Y (AU/year²)', color='white')
+            ax2.set_ylabel(r'推力 Y $m/s^2$', color='white')
             ax2.tick_params(colors='white')
             ax2.grid(True, alpha=0.3)
             
@@ -700,8 +876,7 @@ class DesktopApp:
             ax3 = self.thrust_axes[2]
             ax3.set_facecolor('#2d2d2d')
             ax3.plot(t, uz, 'b-', linewidth=2)
-            ax3.set_xlabel('时间 (天)', color='white')
-            ax3.set_ylabel('推力 Z (AU/year²)', color='white')
+            ax3.set_ylabel(r'推力 Z $m/s^2$', color='white')   
             ax3.tick_params(colors='white')
             ax3.grid(True, alpha=0.3)
             
@@ -710,12 +885,12 @@ class DesktopApp:
             ax4.set_facecolor('#2d2d2d')
             ax4.plot(t, thrust_mag, 'm-', linewidth=2)
             ax4.set_xlabel('时间 (天)', color='white')
-            ax4.set_ylabel('总推力 (AU/year^2)', color='white')
+            ax4.set_ylabel(r'总推力 $m/s^2$', color='white')
             ax4.tick_params(colors='white')
             ax4.grid(True, alpha=0.3)
             
             # 调整布局
-            self.thrust_fig.tight_layout(rect=[0, 0, 1, 0.96])
+            self.thrust_fig.tight_layout()
             
         except Exception as e:
             print(f"更新推力曲线时出错: {e}")
@@ -726,61 +901,6 @@ class DesktopApp:
         self.thrust_canvas = FigureCanvasTkAgg(self.thrust_fig, self.thrust_frame)
         self.thrust_canvas.draw()
         self.thrust_canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
-    
-    def _update_thrust_placeholder(self):
-        """使用占位符数据更新推力曲线图"""
-        # 创建包含4个子图的图形（4行1列）
-        self.thrust_fig, self.thrust_axes = plt.subplots(4, 1, figsize=(6, 10))
-        self.thrust_fig.patch.set_facecolor('#2d2d2d')
-        
-        # 示例时间数据（天）
-        import numpy as np
-        tof_days = 365  # 示例飞行时间
-        t = np.linspace(0, tof_days, 100)
-        
-        # 子图1：X方向推力
-        ax1 = self.thrust_axes[0]
-        ax1.set_facecolor('#2d2d2d')
-        ax1.plot(t, np.sin(2*np.pi*t/tof_days), 'r-', linewidth=2)
-        ax1.set_xlabel('时间 (天)', color='white')
-        ax1.set_ylabel('推力 X (AU/year²)', color='white')
-        ax1.set_title('X方向推力', color='white')
-        ax1.tick_params(colors='white')
-        ax1.grid(True, alpha=0.3)
-        
-        # 子图2：Y方向推力
-        ax2 = self.thrust_axes[1]
-        ax2.set_facecolor('#2d2d2d')
-        ax2.plot(t, np.cos(2*np.pi*t/tof_days), 'g-', linewidth=2)
-        ax2.set_xlabel('时间 (天)', color='white')
-        ax2.set_ylabel('推力 Y (AU/year²)', color='white')
-        ax2.set_title('Y方向推力', color='white')
-        ax2.tick_params(colors='white')
-        ax2.grid(True, alpha=0.3)
-        
-        # 子图3：Z方向推力
-        ax3 = self.thrust_axes[2]
-        ax3.set_facecolor('#2d2d2d')
-        ax3.plot(t, 0.5*np.sin(4*np.pi*t/tof_days), 'b-', linewidth=2)
-        ax3.set_xlabel('时间 (天)', color='white')
-        ax3.set_ylabel('推力 Z (AU/year²)', color='white')
-        ax3.set_title('Z方向推力', color='white')
-        ax3.tick_params(colors='white')
-        ax3.grid(True, alpha=0.3)
-        
-        # 子图4：总推力
-        ax4 = self.thrust_axes[3]
-        ax4.set_facecolor('#2d2d2d')
-        thrust_mag = np.sqrt(np.sin(2*np.pi*t/tof_days)**2 + np.cos(2*np.pi*t/tof_days)**2 + (0.5*np.sin(4*np.pi*t/tof_days))**2)
-        ax4.plot(t, thrust_mag, 'm-', linewidth=2)
-        ax4.set_xlabel('时间 (天)', color='white')
-        ax4.set_ylabel('总推力 (AU/year²)', color='white')
-        ax4.set_title('总推力', color='white')
-        ax4.tick_params(colors='white')
-        ax4.grid(True, alpha=0.3)
-        
-        # 调整布局
-        self.thrust_fig.tight_layout(rect=[0, 0, 1, 0.96])
     
     def on_closing(self):
         """窗口关闭时清理 Matplotlib 资源并退出"""
@@ -886,6 +1006,9 @@ class DesktopApp:
                         except:
                             pass
                 self.ax.clear()
+                # 重新设置轴的属性
+                self.ax.set_axis_off()
+                self.ax.set_box_aspect((1, 1, 1))
             
             # 调用核心绘图函数
             _, _, self.cursors = self.solar_system.plot_solar_system_enhanced(
@@ -899,6 +1022,7 @@ class DesktopApp:
                 self.ax.set_zlim(self.current_view['zlim'])
                 self.ax.view_init(elev=self.current_view['elev'], azim=self.current_view['azim'])
             
+            # 刷新画布
             self.canvas.draw()
         except Exception as e:
             print(f"更新太阳系可视化时出现错误: {str(e)}")

@@ -39,3 +39,9 @@ TIME_CONFIG = {
     "default_days": 0,  # 默认天数
     "step": 10  # 步长
 }
+
+# 输出路径配置
+OUTPUT_CONFIG = {
+    "directory": "Output",  # 输出目录
+    "porkchop_directory": "Output/PorkChop"  # 猪排图输出目录
+}

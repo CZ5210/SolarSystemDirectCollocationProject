@@ -164,7 +164,7 @@ class TrajectoryOptimizer:
         :param TOF: 飞行时间 (年)
         :param N: 网格数
         :param rbound: 半径边界 (AU)，确保轨迹不会太靠近中心天体
-        :param thrust_limit: 推力加速度限制 (AU/year²)，如果为None则无限制
+        :param thrust_limit: 推力加速度限制 (m/s²)，如果为None则无限制
         :return: 优化结果状态向量
         """
 
@@ -325,8 +325,8 @@ class TrajectoryOptimizer:
             - arrival_body: 到达星体名称（默认"海王星"）
             - N: 网格数（默认100）
             - mu: 太阳引力常数 (AU^3/year^2)（默认4*pi^2）
-            - rbound_factor: 半径边界因子（默认0.9）
-            - thrust_limit: 推力加速度限制 (AU/year²)（默认None）
+            - rbound: 最小太阳距离 (AU)（默认0.1）
+            - thrust_limit: 推力加速度限制 (m/s²)（默认None）
         :return: 速度增量 (km/s)
         """
         # 从params字典中获取参数，设置默认值
@@ -338,9 +338,9 @@ class TrajectoryOptimizer:
         plot = params.get('plot', False)
         departure_body = params.get('departure_body', '木星')
         arrival_body = params.get('arrival_body', '海王星')
-        N = params.get('N', 100)
+        N = params.get('N', 20)
         mu = params.get('mu', 4 * np.pi * np.pi)  # 太阳引力常数 (AU^3/year^2)
-        rbound_factor = params.get('rbound_factor', 0.9)  # 半径边界因子
+        rbound = params.get('rbound', 0.1)  # 最小太阳距离 (AU)
         thrust_limit = params.get('thrust_limit', None)  # 推力限制
         
         # 计算出发日期的儒略日
@@ -391,10 +391,9 @@ class TrajectoryOptimizer:
         print(f"  位置: ({xf:.4f}, {yf:.4f}, {zf:.4f}) AU")
         print(f"  速度: ({vxf:.4f}, {vyf:.4f}, {vzf:.4f}) AU/year")
         
-        # 计算初始和结束位置的半径
-        r1 = np.sqrt(x0**2 + y0**2 + z0**2)
-        r2 = np.sqrt(xf**2 + yf**2 + zf**2)
-        rbound = min(r1, r2) * rbound_factor  # 半径边界，确保轨迹不会太靠近太阳
+        # 直接使用用户指定的最小太阳距离 (AU)
+        # rbound 已经在参数中设置，无需计算
+        print(f"最小太阳距离约束: {rbound} AU")
         
         # 计算3D轨迹优化
         solution = self.trapezoidal_collocation_3d(
@@ -427,7 +426,7 @@ class TrajectoryOptimizer:
             departure_time_str = f"{start_year}-{start_month:02d}-{start_day:02d}"
             arrival_time_str = f"{int(end_year)}-{int(end_month):02d}-{int(end_day):02d}"
             fig, ax = self.visualization.plot_trajectory_3d(
-                s0, sf, r1, r2, N, solution, ax=ax, 
+                s0, sf, N, solution, ax=ax, 
                 dv=DV, 
                 departure_time=departure_time_str, 
                 arrival_time=arrival_time_str, 

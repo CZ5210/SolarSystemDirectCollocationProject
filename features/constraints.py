@@ -35,7 +35,7 @@ class Constraints:
         检查推力约束
         
         :param trajectory: 轨迹状态向量
-        :param thrust_limit: 最大推力加速度限制 (AU/year²)
+        :param thrust_limit: 最大推力加速度限制 (m/s²)
         :return: (is_valid, max_thrust) - 是否满足约束，最大推力
         """
         # 提取控制输入信息
@@ -44,36 +44,21 @@ class Constraints:
         u_y = trajectory[7*N:8*N]
         u_z = trajectory[8*N:9*N]
         
-        # 计算每个点的推力大小
-        thrusts = np.sqrt(u_x**2 + u_y**2 + u_z**2)
-        max_thrust = np.max(thrusts)
+        # 计算每个点的推力大小（AU/year²）
+        thrusts_au_year2 = np.sqrt(u_x**2 + u_y**2 + u_z**2)
+        max_thrust_au_year2 = np.max(thrusts_au_year2)
+        
+        # 转换为m/s²
+        # 1 AU = 149597871 km = 149597871000 m
+        # 1 year = 365.25 * 24 * 3600 seconds
+        meters_per_au = 149597871000
+        seconds_per_year = 365.25 * 24 * 3600
+        max_thrust_ms2 = max_thrust_au_year2 * meters_per_au / (seconds_per_year ** 2)
         
         # 检查是否满足约束
-        is_valid = max_thrust <= thrust_limit
+        is_valid = max_thrust_ms2 <= thrust_limit
         
-        return is_valid, max_thrust
-    
-    def convert_thrust_units(self, thrust, from_unit, to_unit):
-        """
-        转换推力单位
-        
-        :param thrust: 推力值
-        :param from_unit: 源单位 ('km/s²', 'AU/year²')
-        :param to_unit: 目标单位 ('km/s²', 'AU/year²')
-        :return: 转换后的推力值
-        """
-        if from_unit == to_unit:
-            return thrust
-        
-        # 转换因子: 1 AU/year² = (149597871 km) / (365.25*24*3600 s)^2
-        conversion_factor = 149597871 / ((365.25 * 24 * 3600) ** 2)
-        
-        if from_unit == 'AU/year²' and to_unit == 'km/s²':
-            return thrust * conversion_factor
-        elif from_unit == 'km/s²' and to_unit == 'AU/year²':
-            return thrust / conversion_factor
-        else:
-            raise ValueError(f"不支持的单位转换: {from_unit} -> {to_unit}")
+        return is_valid, max_thrust_ms2
     
     def calculate_minimum_sun_distance(self, departure_body, arrival_body, 
                                      start_year, start_month, start_day, 
@@ -110,29 +95,3 @@ class Constraints:
         
         return min_distance
 
-if __name__ == "__main__":
-    """
-    约束处理模块测试
-    """
-    print("===== 测试约束处理功能 =====")
-    
-    # 创建约束处理器实例
-    constraints = Constraints()
-    
-    # 测试1：单位转换
-    print("\n测试1：单位转换")
-    thrust_au_year2 = 1.0
-    thrust_km_s2 = constraints.convert_thrust_units(thrust_au_year2, 'AU/year²', 'km/s²')
-    print(f"1 AU/year² = {thrust_km_s2:.6f} km/s²")
-    
-    # 测试2：最小太阳距离计算
-    print("\n测试2：最小太阳距离计算")
-    min_distance = constraints.calculate_minimum_sun_distance(
-        departure_body="木星",
-        arrival_body="海王星",
-        start_year=2300,
-        start_month=6,
-        start_day=1,
-        tof_years=2
-    )
-    print(f"最小太阳距离估计: {min_distance:.4f} AU")
