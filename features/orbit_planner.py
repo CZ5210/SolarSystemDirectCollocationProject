@@ -81,8 +81,8 @@ class OrbitPlanner:
         :return: (is_valid, message)
         """
         # 验证年份
-        if start_year < 2000 or start_year > 2500:
-            return False, "出发年份必须在2000-2500之间"
+        if start_year < 1900:
+            return False, "出发年份必须在1900以后"
         
         # 验证月份
         if start_month < 1 or start_month > 12:
@@ -93,9 +93,25 @@ class OrbitPlanner:
             return False, "日期必须在1-31之间"
         
         # 验证飞行时间
-        if tof_years < 0.1 or tof_years > 20:
-            return False, "飞行时间必须在0.1-20年之间"
+        if tof_years*365.25 < 10 or tof_years > 20:
+            return False, "飞行时间必须在10天-20年之间"
         
+        # 验证月份是否正确（闰年，2月31这种问题）
+        # 每月的天数
+        days_in_month = {
+            1: 31, 2: 28, 3: 31, 4: 30, 5: 31, 6: 30,
+            7: 31, 8: 31, 9: 30, 10: 31, 11: 30, 12: 31
+        }
+        
+        # 检查闰年
+        is_leap_year = (start_year % 4 == 0 and start_year % 100 != 0) or (start_year % 400 == 0)
+        if is_leap_year:
+            days_in_month[2] = 29
+        
+        # 验证日期是否在当月的有效范围内
+        if start_day > days_in_month[start_month]:
+            return False, f"{start_year}年{start_month}月只有{days_in_month[start_month]}天"
+
         # 验证星体名称
         planet_list = self.get_planet_list()
         if departure_body not in planet_list:
@@ -103,9 +119,6 @@ class OrbitPlanner:
         
         if arrival_body not in planet_list:
             return False, f"到达星体必须是以下之一: {', '.join(planet_list)}"
-        
-        if departure_body == arrival_body:
-            return False, "出发星体和到达星体不能相同"
         
         return True, "输入参数有效"
     
