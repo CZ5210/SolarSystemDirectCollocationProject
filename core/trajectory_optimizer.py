@@ -533,7 +533,7 @@ class TrajectoryOptimizer:
         
         return DV
     
-    def compute_porchop_diagram(self, start_year=2300, end_year=2400, step_years=10, 
+    def compute_porchop_diagram(self, start_year=2300, start_month=1, start_day=1, end_year=2400, end_month=12, end_day=1, step_months=12, 
                               tof_range=(1, 10), tof_step=1, departure_body='木星', 
                               arrival_body='海王星', N=30, save_path='porchop_diagram.png'):
         """
@@ -543,10 +543,18 @@ class TrajectoryOptimizer:
         --------
         start_year : int
             起始年份（默认2300）
+        start_month : int
+            起始月份（默认1）
+        start_day : int
+            起始日（默认1）
         end_year : int
             结束年份（默认2400）
-        step_years : int
-            出发年份的步长（默认10年）
+        end_month : int
+            结束月份（默认12）
+        end_day : int
+            结束日（默认1）
+        step_months : int
+            出发时间的步长（月份，默认12）
         tof_range : tuple
             飞行时间范围 (最小年数, 最大年数)（默认(1,10)）
         tof_step : float
@@ -562,30 +570,45 @@ class TrajectoryOptimizer:
         
         返回:
         --------
-        pd.DataFrame: 包含出发年份、飞行时间、速度增量的数据集
+        pd.DataFrame: 包含出发时间、飞行时间、速度增量的数据集
         """
-        # 1. 生成计算网格
-        departure_years = np.arange(start_year, end_year + 1, step_years)
+        # 1. 生成计算网格（支持月份精度）
+        import datetime
+        departure_times = []
+        current_date = datetime.datetime(start_year, start_month, start_day)
+        end_date = datetime.datetime(end_year, end_month, end_day)
+        
+        while current_date <= end_date:
+            departure_times.append(current_date)
+            # 增加步长月份
+            if current_date.month + step_months > 12:
+                new_year = current_date.year + (current_date.month + step_months - 1) // 12
+                new_month = (current_date.month + step_months - 1) % 12 + 1
+            else:
+                new_year = current_date.year
+                new_month = current_date.month + step_months
+            current_date = datetime.datetime(new_year, new_month, 1)
+        
         tof_years_list = np.arange(tof_range[0], tof_range[1] + tof_step, tof_step)
         
         # 初始化结果数组
-        dv_results = np.zeros((len(departure_years), len(tof_years_list)))
+        dv_results = np.zeros((len(departure_times), len(tof_years_list)))
         dv_results[:] = np.nan  # 初始化为NaN，处理计算失败的情况
         
         # 2. 遍历所有出发时间和飞行时间组合计算DV
-        print(f"开始计算猪排图数据 ({len(departure_years)}个出发时间 × {len(tof_years_list)}个飞行时间)")
+        print(f"开始计算猪排图数据 ({len(departure_times)}个出发时间 × {len(tof_years_list)}个飞行时间)")
         print("="*60)
         
-        for i, dep_year in enumerate(departure_years):
+        for i, dep_date in enumerate(departure_times):
             for j, tof in enumerate(tof_years_list):
                 try:
                     # 构建轨迹规划参数
                     params = {
-                        'start_year': dep_year,
-                        'start_month': 6,       # 固定6月出发
-                        'start_day': 1,         # 固定1日出发
+                        'start_year': dep_date.year,
+                        'start_month': dep_date.month,       # 使用实际月份
+                        'start_day': dep_date.day,         # 使用实际日
                         'tof_years': tof,
-                        'file_name': f'Output/PorkChop/temp_{dep_year}_{tof}y.csv',
+                        'file_name': f'Output/PorkChop/temp_{dep_date.year}{dep_date.month:02d}{dep_date.day:02d}_{tof}y.csv',
                         'plot': False,
                         'departure_body': departure_body,
                         'arrival_body': arrival_body,
@@ -597,16 +620,19 @@ class TrajectoryOptimizer:
                     dv = self.real_solar_system_trajectory(params)
                     dv_results[i, j] = dv
                     
-                    print(f"✓ 出发年份: {dep_year}, 飞行时间: {tof}年, 速度增量: {dv:.2f} km/s")
+                    print(f"✓ 出发时间: {dep_date.year}-{dep_date.month:02d}, 飞行时间: {tof}年, 速度增量: {dv:.2f} km/s")
                     
                 except Exception as e:
-                    print(f"✗ 出发年份: {dep_year}, 飞行时间: {tof}年, 计算失败: {str(e)[:50]}")
+                    print(f"✗ 出发时间: {dep_date.year}-{dep_date.month:02d}, 飞行时间: {tof}年, 计算失败: {str(e)[:50]}")
                     dv_results[i, j] = np.nan
         
         # 3. 创建结果DataFrame
+        # 生成出发时间索引（格式：年-月-日）
+        departure_indices = [f'{date.year}-{date.month:02d}-{date.day:02d}' for date in departure_times]
+        
         results_df = pd.DataFrame(
             dv_results,
-            index=departure_years,
+            index=departure_indices,
             columns=[f'{tof}y' for tof in tof_years_list]
         )
         results_df.to_csv('porkchop_results.csv', float_format='%.4f')    

@@ -101,6 +101,9 @@ class UIComponent:
 
         # 初始化结果框架UI
         self.create_results_ui()
+
+        # 初始化猪排图选项卡
+        self.create_porkchop_ui()
     
     def create_plan_ui(self):
         # 第一个选项卡：规划与可视化
@@ -150,90 +153,170 @@ class UIComponent:
         self.notebook.add(self.results_frame, text="计算结果")
 
         # 出发时间
-        ttk.Label(self.right_panel, text="出发时间（地球时间）", font=('Arial', 10, 'bold'), style="Dark.TLabel").grid(row=0, column=0, columnspan=2, sticky=tk.W, pady=(0, 5))
-
+        ttk.Label(self.right_panel, text="出发时间（地球时间）:", font=('Arial', 10, 'bold'), style="Dark.TLabel").grid(row=0, column=0, sticky=tk.W, pady=(0, 5))
+        
+        # 出发时间 - 年、月、日
+        time_frame = ttk.Frame(self.right_panel, style="Dark.TFrame")
+        time_frame.grid(row=1, column=0, columnspan=2, sticky=tk.W, pady=2)
+        
         # 年
-        ttk.Label(self.right_panel, text="年:", style="Dark.TLabel").grid(row=1, column=0, sticky=tk.W, padx=(10, 5))
+        ttk.Label(time_frame, text="年:", style="Dark.TLabel").pack(side=tk.LEFT, padx=(0, 5))
         self.year_var = tk.StringVar(value=str(self.current_date.year))
-        self.year_entry = ttk.Entry(self.right_panel, textvariable=self.year_var, width=10)
-        self.year_entry.grid(row=1, column=1, sticky=tk.W, pady=2)
-
+        self.year_entry = ttk.Entry(time_frame, textvariable=self.year_var, width=8)
+        self.year_entry.pack(side=tk.LEFT, padx=(0, 10))
+        
         # 月
-        ttk.Label(self.right_panel, text="月:", style="Dark.TLabel").grid(row=2, column=0, sticky=tk.W, padx=(10, 5))
+        ttk.Label(time_frame, text="月:", style="Dark.TLabel").pack(side=tk.LEFT, padx=(0, 5))
         self.month_var = tk.StringVar(value=str(self.current_date.month))
-        self.month_entry = ttk.Entry(self.right_panel, textvariable=self.month_var, width=10)
-        self.month_entry.grid(row=2, column=1, sticky=tk.W, pady=2)
-
+        self.month_entry = ttk.Entry(time_frame, textvariable=self.month_var, width=5)
+        self.month_entry.pack(side=tk.LEFT, padx=(0, 10))
+        
         # 日
-        ttk.Label(self.right_panel, text="日:", style="Dark.TLabel").grid(row=3, column=0, sticky=tk.W, padx=(10, 5))
+        ttk.Label(time_frame, text="日:", style="Dark.TLabel").pack(side=tk.LEFT, padx=(0, 5))
         self.day_var = tk.StringVar(value=str(self.current_date.day))
-        self.day_entry = ttk.Entry(self.right_panel, textvariable=self.day_var, width=10)
-        self.day_entry.grid(row=3, column=1, sticky=tk.W, pady=2)
+        self.day_entry = ttk.Entry(time_frame, textvariable=self.day_var, width=5)
+        self.day_entry.pack(side=tk.LEFT, padx=(0, 10))
 
+        # 更新时间按钮
+        self.update_solar_button = ttk.Button(self.right_panel, text="更新时间", style="Dark.TButton")
+        self.update_solar_button.grid(row=2, column=0, columnspan=2, pady=5)
 
-        ttk.Label(self.right_panel, text="任务规划", font=('Arial', 10, 'bold'), style="Dark.TLabel").grid(row=4, column=0, columnspan=2, sticky=tk.W, pady=(10, 5))
+        ttk.Label(self.right_panel, text="任务规划", font=('Arial', 10, 'bold'), style="Dark.TLabel").grid(row=3, column=0, columnspan=2, sticky=tk.W, pady=(10, 5))
 
         # 出发星体
-        ttk.Label(self.right_panel, text="出发星体:", style="Dark.TLabel").grid(row=5, column=0, sticky=tk.W, padx=(10, 5))
+        ttk.Label(self.right_panel, text="出发星体:", style="Dark.TLabel").grid(row=4, column=0, sticky=tk.W, padx=(10, 5))
         self.departure_var = tk.StringVar(value="地球")
         self.departure_combo = ttk.Combobox(self.right_panel, textvariable=self.departure_var, state="readonly", width=15)
-        self.departure_combo.grid(row=5, column=1, sticky=tk.W, pady=2)
+        self.departure_combo.grid(row=4, column=1, sticky=tk.W, pady=2)
 
         # 到达星体
-        ttk.Label(self.right_panel, text="到达星体:", style="Dark.TLabel").grid(row=6, column=0, sticky=tk.W, padx=(10, 5))
+        ttk.Label(self.right_panel, text="到达星体:", style="Dark.TLabel").grid(row=5, column=0, sticky=tk.W, padx=(10, 5))
         self.arrival_var = tk.StringVar(value="火星")
         self.arrival_combo = ttk.Combobox(self.right_panel, textvariable=self.arrival_var, state="readonly", width=15)
-        self.arrival_combo.grid(row=6, column=1, sticky=tk.W, pady=2)
+        self.arrival_combo.grid(row=5, column=1, sticky=tk.W, pady=2)
 
         # 飞行时间（天）
-        ttk.Label(self.right_panel, text="飞行时间（地球日）:", style="Dark.TLabel").grid(row=7, column=0, sticky=tk.W, padx=(10, 5), pady=(10, 5))
+        ttk.Label(self.right_panel, text="飞行时间（地球日）:", style="Dark.TLabel").grid(row=6, column=0, sticky=tk.W, padx=(10, 5), pady=(10, 5))
         self.tof_days_var = tk.StringVar(value="365")
         self.tof_days_entry = ttk.Entry(self.right_panel, textvariable=self.tof_days_var, width=10)
-        self.tof_days_entry.grid(row=7, column=1, sticky=tk.W, pady=(10, 5))
+        self.tof_days_entry.grid(row=6, column=1, sticky=tk.W, pady=(10, 5))
 
-        ttk.Label(self.right_panel, text="规划参数", font=('Arial', 10, 'bold'), style="Dark.TLabel").grid(row=8, column=0, columnspan=2, sticky=tk.W, pady=(10, 5))
+        ttk.Label(self.right_panel, text="规划参数", font=('Arial', 10, 'bold'), style="Dark.TLabel").grid(row=7, column=0, columnspan=2, sticky=tk.W, pady=(10, 5))
         # 网格数
-        ttk.Label(self.right_panel, text="网格数 (N):", style="Dark.TLabel").grid(row=9, column=0, sticky=tk.W, padx=(10, 5))
+        ttk.Label(self.right_panel, text="网格数 (N):", style="Dark.TLabel").grid(row=8, column=0, sticky=tk.W, padx=(10, 5))
         self.N_var = tk.StringVar(value="20")
         self.N_entry = ttk.Entry(self.right_panel, textvariable=self.N_var, width=10)
-        self.N_entry.grid(row=9, column=1, sticky=tk.W, pady=2)
+        self.N_entry.grid(row=8, column=1, sticky=tk.W, pady=2)
 
         # 最小太阳距离 (AU)
-        ttk.Label(self.right_panel, text="最小太阳距离 (AU):", style="Dark.TLabel").grid(row=10, column=0, sticky=tk.W, padx=(10, 5))
+        ttk.Label(self.right_panel, text="最小太阳距离 (AU):", style="Dark.TLabel").grid(row=9, column=0, sticky=tk.W, padx=(10, 5))
         self.rbound_var = tk.StringVar(value="0.1")
         self.rbound_entry = ttk.Entry(self.right_panel, textvariable=self.rbound_var, width=10)
-        self.rbound_entry.grid(row=10, column=1, sticky=tk.W, pady=2)
+        self.rbound_entry.grid(row=9, column=1, sticky=tk.W, pady=2)
 
         # 推力限制（可选）
-        ttk.Label(self.right_panel, text="推力限制 (m/s²):", style="Dark.TLabel").grid(row=11, column=0, sticky=tk.W, padx=(10, 5), pady=(5, 5))
+        ttk.Label(self.right_panel, text="推力限制 (m/s²):", style="Dark.TLabel").grid(row=10, column=0, sticky=tk.W, padx=(10, 5), pady=(5, 5))
         self.thrust_var = tk.StringVar(value="")
         self.thrust_entry = ttk.Entry(self.right_panel, textvariable=self.thrust_var, width=10)
-        self.thrust_entry.grid(row=11, column=1, sticky=tk.W, pady=(5, 5))
+        self.thrust_entry.grid(row=10, column=1, sticky=tk.W, pady=(5, 5))
 
         # 最大迭代次数
-        ttk.Label(self.right_panel, text="最大迭代次数:", style="Dark.TLabel").grid(row=12, column=0, sticky=tk.W, padx=(10, 5), pady=(5, 5))
+        ttk.Label(self.right_panel, text="最大迭代次数:", style="Dark.TLabel").grid(row=11, column=0, sticky=tk.W, padx=(10, 5), pady=(5, 5))
         self.maxiter_var = tk.StringVar(value="50")
         self.maxiter_entry = ttk.Entry(self.right_panel, textvariable=self.maxiter_var, width=10)
-        self.maxiter_entry.grid(row=12, column=1, sticky=tk.W, pady=(5, 5))
+        self.maxiter_entry.grid(row=11, column=1, sticky=tk.W, pady=(5, 5))
 
         # 初始猜测方法
-        ttk.Label(self.right_panel, text="初始猜测方法:", style="Dark.TLabel").grid(row=13, column=0, sticky=tk.W, padx=(10, 5), pady=(10, 5))
+        ttk.Label(self.right_panel, text="初始猜测方法:", style="Dark.TLabel").grid(row=12, column=0, sticky=tk.W, padx=(10, 5), pady=(10, 5))
         self.guess_method_var = tk.StringVar(value="linear")
         guess_frame = ttk.Frame(self.right_panel, style="Dark.TFrame")
-        guess_frame.grid(row=13, column=1, sticky=tk.W, pady=(10, 5))
+        guess_frame.grid(row=12, column=1, sticky=tk.W, pady=(10, 5))
         ttk.Radiobutton(guess_frame, text="线性", variable=self.guess_method_var, value="linear", style="Dark.TRadiobutton").pack(side=tk.LEFT, padx=5)
         ttk.Radiobutton(guess_frame, text="椭圆", variable=self.guess_method_var, value="elliptic", style="Dark.TRadiobutton").pack(side=tk.LEFT, padx=5)
 
         # 开始计算按钮
         self.calculate_button = ttk.Button(self.right_panel, text="开始计算", style="Dark.TButton")
-        self.calculate_button.grid(row=14, column=0, columnspan=2, pady=20)
+        self.calculate_button.grid(row=13, column=0, columnspan=2, pady=20)
+
+        # 猪排图参数
+        ttk.Label(self.right_panel, text="猪排图参数", font=('Arial', 10, 'bold'), style="Dark.TLabel").grid(row=14, column=0, columnspan=2, sticky=tk.W, pady=(10, 5))
+
+        # 最早出发时间
+        ttk.Label(self.right_panel, text="最早出发时间:", font=('Arial', 9, 'bold'), style="Dark.TLabel").grid(row=15, column=0, columnspan=2, sticky=tk.W, padx=(10, 5), pady=2)
+        
+        # 最早出发时间 - 年
+        ttk.Label(self.right_panel, text="年:", style="Dark.TLabel").grid(row=16, column=0, sticky=tk.W, padx=(20, 5))
+        self.earliest_year_var = tk.StringVar(value=str(self.current_date.year))
+        self.earliest_year_entry = ttk.Entry(self.right_panel, textvariable=self.earliest_year_var, width=8)
+        self.earliest_year_entry.grid(row=16, column=0, sticky=tk.W, padx=(40, 5))
+        
+        # 最早出发时间 - 月
+        ttk.Label(self.right_panel, text="月:", style="Dark.TLabel").grid(row=16, column=0, sticky=tk.W, padx=(100, 5))
+        self.earliest_month_var = tk.StringVar(value=str(self.current_date.month))
+        self.earliest_month_entry = ttk.Entry(self.right_panel, textvariable=self.earliest_month_var, width=5)
+        self.earliest_month_entry.grid(row=16, column=0, sticky=tk.W, padx=(120, 5))
+        
+        # 最早出发时间 - 日
+        ttk.Label(self.right_panel, text="日:", style="Dark.TLabel").grid(row=16, column=0, sticky=tk.W, padx=(170, 5))
+        self.earliest_day_var = tk.StringVar(value=str(self.current_date.day))
+        self.earliest_day_entry = ttk.Entry(self.right_panel, textvariable=self.earliest_day_var, width=5)
+        self.earliest_day_entry.grid(row=16, column=0, sticky=tk.W, padx=(190, 5))
+
+        # 最晚出发时间
+        ttk.Label(self.right_panel, text="最晚出发时间:", font=('Arial', 9, 'bold'), style="Dark.TLabel").grid(row=17, column=0, columnspan=2, sticky=tk.W, padx=(10, 5), pady=2)
+        
+        # 最晚出发时间 - 年
+        ttk.Label(self.right_panel, text="年:", style="Dark.TLabel").grid(row=18, column=0, sticky=tk.W, padx=(20, 5))
+        self.latest_year_var = tk.StringVar(value=str(self.current_date.year + 1))
+        self.latest_year_entry = ttk.Entry(self.right_panel, textvariable=self.latest_year_var, width=8)
+        self.latest_year_entry.grid(row=18, column=0, sticky=tk.W, padx=(40, 5))
+        
+        # 最晚出发时间 - 月
+        ttk.Label(self.right_panel, text="月:", style="Dark.TLabel").grid(row=18, column=0, sticky=tk.W, padx=(100, 5))
+        self.latest_month_var = tk.StringVar(value=str(self.current_date.month))
+        self.latest_month_entry = ttk.Entry(self.right_panel, textvariable=self.latest_month_var, width=5)
+        self.latest_month_entry.grid(row=18, column=0, sticky=tk.W, padx=(120, 5))
+        
+        # 最晚出发时间 - 日
+        ttk.Label(self.right_panel, text="日:", style="Dark.TLabel").grid(row=18, column=0, sticky=tk.W, padx=(170, 5))
+        self.latest_day_var = tk.StringVar(value=str(self.current_date.day))
+        self.latest_day_entry = ttk.Entry(self.right_panel, textvariable=self.latest_day_var, width=5)
+        self.latest_day_entry.grid(row=18, column=0, sticky=tk.W, padx=(190, 5))
+
+        # 最短飞行时间（地球日）
+        ttk.Label(self.right_panel, text="最短飞行时间（地球日）:", style="Dark.TLabel").grid(row=19, column=0, sticky=tk.W, padx=(10, 5), pady=2)
+        self.min_tof_var = tk.StringVar(value="180")
+        self.min_tof_entry = ttk.Entry(self.right_panel, textvariable=self.min_tof_var, width=10)
+        self.min_tof_entry.grid(row=19, column=1, sticky=tk.W, pady=2)
+
+        # 最长飞行时间（地球日）
+        ttk.Label(self.right_panel, text="最长飞行时间（地球日）:", style="Dark.TLabel").grid(row=20, column=0, sticky=tk.W, padx=(10, 5), pady=2)
+        self.max_tof_var = tk.StringVar(value="730")
+        self.max_tof_entry = ttk.Entry(self.right_panel, textvariable=self.max_tof_var, width=10)
+        self.max_tof_entry.grid(row=20, column=1, sticky=tk.W, pady=2)
+
+        # 网格密度 X（出发时间方向）
+        ttk.Label(self.right_panel, text="网格密度 X（出发时间）:", style="Dark.TLabel").grid(row=21, column=0, sticky=tk.W, padx=(10, 5), pady=2)
+        self.grid_density_x_var = tk.StringVar(value="3")
+        self.grid_density_x_entry = ttk.Entry(self.right_panel, textvariable=self.grid_density_x_var, width=10)
+        self.grid_density_x_entry.grid(row=21, column=1, sticky=tk.W, pady=2)
+
+        # 网格密度 Y（飞行时间方向）
+        ttk.Label(self.right_panel, text="网格密度 Y（飞行时间）:", style="Dark.TLabel").grid(row=22, column=0, sticky=tk.W, padx=(10, 5), pady=2)
+        self.grid_density_y_var = tk.StringVar(value="3")
+        self.grid_density_y_entry = ttk.Entry(self.right_panel, textvariable=self.grid_density_y_var, width=10)
+        self.grid_density_y_entry.grid(row=22, column=1, sticky=tk.W, pady=2)
+
+        # 绘制猪排图按钮
+        self.porkchop_button = ttk.Button(self.right_panel, text="绘制猪排图", style="Dark.TButton")
+        self.porkchop_button.grid(row=23, column=0, columnspan=2, pady=10)
 
         # 输出日志面板
-        ttk.Label(self.right_panel, text="计算日志", font=('Arial', 10, 'bold'), style="Dark.TLabel").grid(row=15, column=0, columnspan=2, sticky=tk.W, pady=(10, 5))
+        ttk.Label(self.right_panel, text="计算日志", font=('Arial', 10, 'bold'), style="Dark.TLabel").grid(row=24, column=0, columnspan=2, sticky=tk.W, pady=(10, 5))
         
         # 日志面板框架
         self.log_frame = ttk.LabelFrame(self.right_panel, padding="5", style="Dark.TLabelframe")
-        self.log_frame.grid(row=16, column=0, columnspan=2, sticky=tk.NSEW, pady=5)
+        self.log_frame.grid(row=25, column=0, columnspan=2, sticky=tk.NSEW, pady=5)
         self.log_frame.grid_columnconfigure(0, weight=1)
         self.log_frame.grid_rowconfigure(0, weight=1)
         
@@ -249,8 +332,87 @@ class UIComponent:
         # 日志折叠/展开按钮
         self.log_collapsed = False
         self.log_toggle_button = ttk.Button(self.right_panel, text="折叠日志", style="Dark.TButton")
-        self.log_toggle_button.grid(row=17, column=0, columnspan=2, pady=5)
+        self.log_toggle_button.grid(row=26, column=0, columnspan=2, pady=5)
 
+
+    def create_porkchop_ui(self):
+        """创建猪排图选项卡的UI"""
+        # 创建猪排图选项卡
+        self.porkchop_frame = ttk.Frame(self.notebook, style="Dark.TFrame")
+        self.notebook.add(self.porkchop_frame, text="猪排图绘制")
+        
+        # 配置猪排图框架的网格布局
+        self.porkchop_frame.grid_columnconfigure(0, weight=1)  # 左侧猪排图
+        self.porkchop_frame.grid_columnconfigure(1, weight=1)  # 右侧太阳系可视化
+        self.porkchop_frame.grid_rowconfigure(0, weight=1)     # 图表区域
+        self.porkchop_frame.grid_rowconfigure(1, weight=0)     # 关键数据区域
+        
+        # 左侧：猪排图
+        self.porkchop_plot_frame = ttk.LabelFrame(self.porkchop_frame, padding="10", style="Dark.TLabelframe")
+        self.porkchop_plot_frame.grid(row=0, column=0, sticky=tk.NSEW, padx=(10, 5), pady=10)
+        self.porkchop_plot_frame.grid_columnconfigure(0, weight=1)
+        self.porkchop_plot_frame.grid_rowconfigure(0, weight=1)
+        
+        # 右侧：太阳系可视化
+        self.porkchop_solar_frame = ttk.LabelFrame(self.porkchop_frame, padding="10", style="Dark.TLabelframe")
+        self.porkchop_solar_frame.grid(row=0, column=1, sticky=tk.NSEW, padx=(5, 10), pady=10)
+        self.porkchop_solar_frame.grid_columnconfigure(0, weight=1)
+        self.porkchop_solar_frame.grid_rowconfigure(0, weight=1)
+        
+        # 底部：关键数据面板
+        self.porkchop_data_frame = ttk.LabelFrame(self.porkchop_frame, text="优化关键参数", padding="10", style="Dark.TLabelframe")
+        self.porkchop_data_frame.grid(row=1, column=0, columnspan=2, sticky=tk.EW, pady=(0, 10))
+        self.porkchop_data_frame.grid_columnconfigure(0, weight=1)  # 左侧参数
+        self.porkchop_data_frame.grid_columnconfigure(1, weight=2)  # 右侧时间轴
+        
+        # 左侧：参数显示（四个参数放在一行）
+        porkchop_params_frame = ttk.Frame(self.porkchop_data_frame, style="Dark.TFrame")
+        porkchop_params_frame.grid(row=0, column=0, sticky=tk.W)
+        porkchop_params_frame.grid_columnconfigure(0, weight=1)
+        porkchop_params_frame.grid_columnconfigure(1, weight=1)
+        porkchop_params_frame.grid_columnconfigure(2, weight=1)
+        porkchop_params_frame.grid_columnconfigure(3, weight=1)
+        
+        # 速度增量 (ΔV)
+        self.porkchop_dv_var = tk.StringVar(value="ΔV: 未计算")
+        self.porkchop_dv_label = ttk.Label(porkchop_params_frame, textvariable=self.porkchop_dv_var, font=('Arial', 12, 'bold'), style="Dark.TLabel", foreground="lightgreen")
+        self.porkchop_dv_label.grid(row=0, column=0, sticky=tk.W, padx=10, pady=5)
+        
+        # 飞行时间
+        self.porkchop_tof_var = tk.StringVar(value="飞行时间: 未计算")
+        self.porkchop_tof_label = ttk.Label(porkchop_params_frame, textvariable=self.porkchop_tof_var, font=('Arial', 12, 'bold'), style="Dark.TLabel", foreground="lightgreen")
+        self.porkchop_tof_label.grid(row=0, column=1, sticky=tk.W, padx=10, pady=5)
+        
+        # 出发时间
+        self.porkchop_departure_var = tk.StringVar(value="出发时间: 未计算")
+        self.porkchop_departure_label = ttk.Label(porkchop_params_frame, textvariable=self.porkchop_departure_var, font=('Arial', 12, 'bold'), style="Dark.TLabel", foreground="lightgreen")
+        self.porkchop_departure_label.grid(row=0, column=2, sticky=tk.W, padx=10, pady=5)
+        
+        # 到达时间
+        self.porkchop_arrival_var = tk.StringVar(value="到达时间: 未计算")
+        self.porkchop_arrival_label = ttk.Label(porkchop_params_frame, textvariable=self.porkchop_arrival_var, font=('Arial', 12, 'bold'), style="Dark.TLabel", foreground="lightgreen")
+        self.porkchop_arrival_label.grid(row=0, column=3, sticky=tk.W, padx=10, pady=5)
+        
+        # 右侧：时间轴（靠右显示）
+        self.porkchop_time_slider_frame = ttk.Frame(self.porkchop_data_frame, style="Dark.TFrame")
+        self.porkchop_time_slider_frame.grid(row=0, column=1, sticky=tk.E)
+        self.porkchop_time_slider_frame.grid_columnconfigure(1, weight=1)
+        
+        # 滑块标签
+        ttk.Label(self.porkchop_time_slider_frame, text="任务时间轴:", style="Dark.TLabel").grid(row=0, column=0, sticky=tk.E, padx=10, pady=5)
+        
+        # 出发时间标签
+        self.porkchop_start_time_var = tk.StringVar(value="出发时间: 未设置")
+        ttk.Label(self.porkchop_time_slider_frame, textvariable=self.porkchop_start_time_var, style="Dark.TLabel").grid(row=0, column=1, sticky=tk.E, padx=10, pady=5)
+        
+        # 时间滑块
+        self.porkchop_trajectory_slider = ttk.Scale(self.porkchop_time_slider_frame, from_=0, to=100, orient=tk.HORIZONTAL, length=400, style="Dark.Horizontal.TScale")
+        self.porkchop_trajectory_slider.set(0)
+        self.porkchop_trajectory_slider.grid(row=0, column=2, sticky=tk.E, padx=10, pady=5)
+        
+        # 到达时间标签
+        self.porkchop_end_time_var = tk.StringVar(value="到达时间: 未设置")
+        ttk.Label(self.porkchop_time_slider_frame, textvariable=self.porkchop_end_time_var, style="Dark.TLabel").grid(row=0, column=3, sticky=tk.W, padx=10, pady=5)
 
     def create_results_ui(self):
         """创建结果框架的UI"""
@@ -278,42 +440,45 @@ class UIComponent:
         thrust_placeholder = ttk.Label(self.thrust_frame, style="Dark.TLabel")
         thrust_placeholder.pack(expand=True)
         
-        # 时间滑块面板
-        self.time_slider_frame = ttk.LabelFrame(self.results_frame, text="任务时间轴", padding="10", style="Dark.TLabelframe")
-        self.time_slider_frame.grid(row=1, column=0, columnspan=2, sticky=tk.EW, pady=(0, 5))
-        self.time_slider_frame.grid_columnconfigure(0, weight=1)
+        # 底部：关键数据和时间轴面板（合并在一起）
+        self.data_frame = ttk.LabelFrame(self.results_frame, text="关键数据与任务时间轴", padding="10", style="Dark.TLabelframe")
+        self.data_frame.grid(row=1, column=0, columnspan=2, sticky=tk.EW, pady=(0, 10))
+        self.data_frame.grid_columnconfigure(0, weight=3)  # 左侧时间轴（占3份）
+        self.data_frame.grid_columnconfigure(1, weight=1)  # 右侧关键数据（占1份）
+        
+        # 左侧：任务时间轴
+        time_slider_frame = ttk.Frame(self.data_frame, style="Dark.TFrame")
+        time_slider_frame.grid(row=0, column=0, sticky=tk.W)
         
         # 滑块标签
-        ttk.Label(self.time_slider_frame, text="时间进度:", style="Dark.TLabel").pack(side=tk.LEFT, padx=10, pady=5)
+        ttk.Label(time_slider_frame, text="时间进度:", style="Dark.TLabel").pack(side=tk.LEFT, padx=10, pady=5)
         
         # 出发时间标签
         self.start_time_var = tk.StringVar(value="出发时间: 未设置")
-        ttk.Label(self.time_slider_frame, textvariable=self.start_time_var, style="Dark.TLabel").pack(side=tk.LEFT, padx=10, pady=5)
+        ttk.Label(time_slider_frame, textvariable=self.start_time_var, style="Dark.TLabel").pack(side=tk.LEFT, padx=10, pady=5)
         
         # 时间滑块
-        self.trajectory_slider = ttk.Scale(self.time_slider_frame, from_=0, to=100, orient=tk.HORIZONTAL, length=400, style="Dark.Horizontal.TScale")
+        self.trajectory_slider = ttk.Scale(time_slider_frame, from_=0, to=100, orient=tk.HORIZONTAL, length=400, style="Dark.Horizontal.TScale")
         self.trajectory_slider.set(0)
         self.trajectory_slider.pack(side=tk.LEFT, padx=10, pady=5)
         
         # 到达时间标签
         self.end_time_var = tk.StringVar(value="到达时间: 未设置")
-        ttk.Label(self.time_slider_frame, textvariable=self.end_time_var, style="Dark.TLabel").pack(side=tk.LEFT, padx=10, pady=5)
+        ttk.Label(time_slider_frame, textvariable=self.end_time_var, style="Dark.TLabel").pack(side=tk.LEFT, padx=10, pady=5)
         
-        # 底部：关键数据面板
-        self.data_frame = ttk.LabelFrame(self.results_frame, text="关键数据", padding="10", style="Dark.TLabelframe")
-        self.data_frame.grid(row=2, column=0, columnspan=2, sticky=tk.EW, pady=(5, 10))
-        self.data_frame.grid_columnconfigure(0, weight=1)
-        self.data_frame.grid_columnconfigure(1, weight=1)
+        # 右侧：关键数据
+        params_frame = ttk.Frame(self.data_frame, style="Dark.TFrame")
+        params_frame.grid(row=0, column=1, sticky=tk.E)
         
         # 速度增量 (ΔV)
         self.dv_var = tk.StringVar(value="ΔV: 未计算")
-        self.dv_label = ttk.Label(self.data_frame, textvariable=self.dv_var, font=('Arial', 12, 'bold'), style="Dark.TLabel", foreground="lightgreen")
-        self.dv_label.grid(row=0, column=0, sticky=tk.W, padx=10, pady=5)
+        self.dv_label = ttk.Label(params_frame, textvariable=self.dv_var, font=('Arial', 12, 'bold'), style="Dark.TLabel", foreground="lightgreen")
+        self.dv_label.pack(side=tk.RIGHT, padx=10, pady=5)
         
         # 最大推力加速度
         self.max_thrust_accel_var = tk.StringVar(value="最大推力加速度: 未计算")
-        self.max_thrust_accel_label = ttk.Label(self.data_frame, textvariable=self.max_thrust_accel_var, font=('Arial', 12, 'bold'), style="Dark.TLabel", foreground="lightgreen")
-        self.max_thrust_accel_label.grid(row=0, column=1, sticky=tk.W, padx=10, pady=5)
+        self.max_thrust_accel_label = ttk.Label(params_frame, textvariable=self.max_thrust_accel_var, font=('Arial', 12, 'bold'), style="Dark.TLabel", foreground="lightgreen")
+        self.max_thrust_accel_label.pack(side=tk.RIGHT, padx=10, pady=5)
     
     def set_planet_list(self, planet_list):
         """设置行星列表"""

@@ -35,7 +35,7 @@ CHART_CONFIG = {
 # 时间参数配置
 TIME_CONFIG = {
     "min_days": 0,  # 最小天数（只能前进）
-    "max_days": 365*5,  # 最大天数
+    "max_days": 365*10,  # 最大天数（10年）
     "default_days": 0,  # 默认天数
     "step": 10  # 步长
 }
@@ -44,4 +44,11 @@ TIME_CONFIG = {
 OUTPUT_CONFIG = {
     "directory": "Output",  # 输出目录
     "porkchop_directory": "Output/PorkChop"  # 猪排图输出目录
+}
+
+# 猪排图配置
+PORKCHOP_CONFIG = {
+    "grid_density_x": 3,  # x轴网格密度（出发时间）
+    "grid_density_y": 3,  # y轴网格密度（飞行时间）
+    "min_tof_days": 20  # 最小飞行时间（天）
 }

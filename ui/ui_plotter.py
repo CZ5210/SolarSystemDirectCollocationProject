@@ -25,76 +25,134 @@ class UIPlotter:
         self.thrust_fig = None
         self.thrust_canvas = None
         self.thrust_axes = None
+        
+        # 猪排图太阳系相关属性
+        self.porkchop_solar_fig = None
+        self.porkchop_solar_canvas = None
+        self.porkchop_solar_ax = None
+        self.porkchop_solar_cursors = []
     
-    def update_solar_system(self, viz_frame, date, solar_system):
+    def update_solar_system(self, viz_frame, date, solar_system, is_porkchop=False):
         """更新太阳系可视化"""
         try:
-            # 保存当前视角（如果 ax 存在）
-            if self.ax is not None:
-                self.current_view = {
-                    'xlim': self.ax.get_xlim(),
-                    'ylim': self.ax.get_ylim(),
-                    'zlim': self.ax.get_zlim(),
-                    'elev': self.ax.elev,
-                    'azim': self.ax.azim
-                }
-            
-            # 检查是否需要重新创建画布
-            if self.fig is None or self.canvas is None or self.ax is None:
-                # 关闭旧的 figure 避免资源泄漏
-                if self.fig is not None:
-                    plt.close(self.fig)
+            if is_porkchop:
+                # 猪排图选项卡的太阳系可视化
+                # 检查是否需要重新创建画布
+                if self.porkchop_solar_fig is None or self.porkchop_solar_canvas is None or self.porkchop_solar_ax is None:
+                    # 关闭旧的 figure 避免资源泄漏
+                    if self.porkchop_solar_fig is not None:
+                        plt.close(self.porkchop_solar_fig)
+                    
+                    # 使用固定大小的 figure（10x10 英寸，1:1 长宽比）
+                    self.porkchop_solar_fig = plt.figure(figsize=(10, 10), facecolor='black')
+                    # 移除边距，让轴域填满整个 Figure
+                    self.porkchop_solar_fig.subplots_adjust(left=0, right=1, top=1, bottom=0)
+                    self.porkchop_solar_ax = self.porkchop_solar_fig.add_subplot(111, projection='3d')
+                    # 关闭轴的裁剪，使轨道线即使在视图外也能完整绘制
+                    self.porkchop_solar_ax.set_axis_off()  # 关闭坐标轴显示
+                    # 设置 3D 轴的长宽比为 1:1:1，确保球体显示正确
+                    self.porkchop_solar_ax.set_box_aspect((1, 1, 1))
+                    self.porkchop_solar_canvas = FigureCanvasTkAgg(self.porkchop_solar_fig, master=viz_frame)
+                    # 绑定鼠标事件
+                    self.porkchop_solar_fig.canvas.mpl_connect('scroll_event', self.on_scroll)
+                    self.porkchop_solar_fig.canvas.mpl_connect('motion_notify_event', self.on_motion)
+                    self.porkchop_solar_canvas.draw()
+                    self.porkchop_solar_canvas.get_tk_widget().pack(fill='both', expand=True)
+                else:
+                    # 清理旧的光标对象
+                    if self.porkchop_solar_cursors:
+                        for cursor in self.porkchop_solar_cursors:
+                            try:
+                                cursor.remove()
+                            except:
+                                pass
+                    self.porkchop_solar_ax.clear()
+                    # 重新设置轴的属性
+                    self.porkchop_solar_ax.set_axis_off()
+                    self.porkchop_solar_ax.set_box_aspect((1, 1, 1))
                 
-                # 使用固定大小的 figure（10x10 英寸，1:1 长宽比）
-                self.fig = plt.figure(figsize=(10, 10), facecolor='black')
-                # 移除边距，让轴域填满整个 Figure
-                self.fig.subplots_adjust(left=0, right=1, top=1, bottom=0)
-                self.ax = self.fig.add_subplot(111, projection='3d')
-                # 关闭轴的裁剪，使轨道线即使在视图外也能完整绘制
-                self.ax.set_axis_off()  # 关闭坐标轴显示
-                # 设置 3D 轴的长宽比为 1:1:1，确保球体显示正确
-                self.ax.set_box_aspect((1, 1, 1))
-                self.canvas = FigureCanvasTkAgg(self.fig, master=viz_frame)
-                # 绑定鼠标事件
-                self.fig.canvas.mpl_connect('scroll_event', self.on_scroll)
-                self.fig.canvas.mpl_connect('motion_notify_event', self.on_motion)
-                self.canvas.draw()
-                self.canvas.get_tk_widget().pack(fill='both', expand=True)
+                # 调用核心绘图函数
+                _, _, self.porkchop_solar_cursors = solar_system.plot_solar_system_enhanced(
+                    date.year, date.month, date.day, view_3d=True, ax=self.porkchop_solar_ax
+                )
+                
+                # 刷新画布
+                self.porkchop_solar_canvas.draw()
             else:
-                # 清理旧的光标对象
-                if self.cursors:
-                    for cursor in self.cursors:
-                        try:
-                            cursor.remove()
-                        except:
-                            pass
-                self.ax.clear()
-                # 重新设置轴的属性
-                self.ax.set_axis_off()
-                self.ax.set_box_aspect((1, 1, 1))
-            
-            # 调用核心绘图函数
-            _, _, self.cursors = solar_system.plot_solar_system_enhanced(
-                date.year, date.month, date.day, view_3d=True, ax=self.ax
-            )
-            
-            # 恢复视角
-            if self.current_view is not None:
-                self.ax.set_xlim(self.current_view['xlim'])
-                self.ax.set_ylim(self.current_view['ylim'])
-                self.ax.set_zlim(self.current_view['zlim'])
-                self.ax.view_init(elev=self.current_view['elev'], azim=self.current_view['azim'])
-            
-            # 刷新画布
-            self.canvas.draw()
+                # 主选项卡的太阳系可视化
+                # 保存当前视角（如果 ax 存在）
+                if self.ax is not None:
+                    self.current_view = {
+                        'xlim': self.ax.get_xlim(),
+                        'ylim': self.ax.get_ylim(),
+                        'zlim': self.ax.get_zlim(),
+                        'elev': self.ax.elev,
+                        'azim': self.ax.azim
+                    }
+                
+                # 检查是否需要重新创建画布
+                if self.fig is None or self.canvas is None or self.ax is None:
+                    # 关闭旧的 figure 避免资源泄漏
+                    if self.fig is not None:
+                        plt.close(self.fig)
+                    
+                    # 使用固定大小的 figure（10x10 英寸，1:1 长宽比）
+                    self.fig = plt.figure(figsize=(10, 10), facecolor='black')
+                    # 移除边距，让轴域填满整个 Figure
+                    self.fig.subplots_adjust(left=0, right=1, top=1, bottom=0)
+                    self.ax = self.fig.add_subplot(111, projection='3d')
+                    # 关闭轴的裁剪，使轨道线即使在视图外也能完整绘制
+                    self.ax.set_axis_off()  # 关闭坐标轴显示
+                    # 设置 3D 轴的长宽比为 1:1:1，确保球体显示正确
+                    self.ax.set_box_aspect((1, 1, 1))
+                    self.canvas = FigureCanvasTkAgg(self.fig, master=viz_frame)
+                    # 绑定鼠标事件
+                    self.fig.canvas.mpl_connect('scroll_event', self.on_scroll)
+                    self.fig.canvas.mpl_connect('motion_notify_event', self.on_motion)
+                    self.canvas.draw()
+                    self.canvas.get_tk_widget().pack(fill='both', expand=True)
+                else:
+                    # 清理旧的光标对象
+                    if self.cursors:
+                        for cursor in self.cursors:
+                            try:
+                                cursor.remove()
+                            except:
+                                pass
+                    self.ax.clear()
+                    # 重新设置轴的属性
+                    self.ax.set_axis_off()
+                    self.ax.set_box_aspect((1, 1, 1))
+                
+                # 调用核心绘图函数
+                _, _, self.cursors = solar_system.plot_solar_system_enhanced(
+                    date.year, date.month, date.day, view_3d=True, ax=self.ax
+                )
+                
+                # 恢复视角
+                if self.current_view is not None:
+                    self.ax.set_xlim(self.current_view['xlim'])
+                    self.ax.set_ylim(self.current_view['ylim'])
+                    self.ax.set_zlim(self.current_view['zlim'])
+                    self.ax.view_init(elev=self.current_view['elev'], azim=self.current_view['azim'])
+                
+                # 刷新画布
+                self.canvas.draw()
         except Exception as e:
             print(f"更新太阳系可视化时出现错误: {str(e)}")
             # 重置画布，下次重试
-            if self.fig:
-                plt.close(self.fig)
-            self.fig = None
-            self.canvas = None
-            self.ax = None
+            if is_porkchop:
+                if self.porkchop_solar_fig:
+                    plt.close(self.porkchop_solar_fig)
+                self.porkchop_solar_fig = None
+                self.porkchop_solar_canvas = None
+                self.porkchop_solar_ax = None
+            else:
+                if self.fig:
+                    plt.close(self.fig)
+                self.fig = None
+                self.canvas = None
+                self.ax = None
     
     def update_trajectory_plot(self, trajectory_frame, trajectory_data, trajectory_params):
         """更新转移轨迹图"""
@@ -445,6 +503,12 @@ class UIPlotter:
                     ax = self.trajectory_ax
                     canvas = self.trajectory_canvas
         
+        # 检查是否是猪排图太阳系的事件
+        if ax is None and self.porkchop_solar_ax:
+            if event.inaxes == self.porkchop_solar_ax:
+                ax = self.porkchop_solar_ax
+                canvas = self.porkchop_solar_canvas
+        
         # 如果不是轨迹图的事件，使用主太阳系视图的轴
         if ax is None and self.ax:
             if event.inaxes == self.ax:
@@ -493,7 +557,223 @@ class UIPlotter:
                                     sel.annotation.set_visible(False)
                     except:
                         pass
+            
+            # 清除猪排图太阳系视图的cursor（如果有）
+            if self.porkchop_solar_cursors:
+                for cursor in self.porkchop_solar_cursors:
+                    try:
+                        if cursor.selections:
+                            for sel in cursor.selections:
+                                if hasattr(sel, 'annotation') and sel.annotation:
+                                    sel.annotation.set_visible(False)
+                    except:
+                        pass
     
+    def plot_porkchop(self, porkchop_frame, results_df):
+        """绘制猪排图"""
+        try:
+            import pandas as pd
+            import numpy as np
+            import matplotlib.pyplot as plt
+            from matplotlib import cm, colors
+            from scipy.interpolate import griddata
+            
+            # 解析数据（支持月份精度）
+            # 解析出发时间（格式：年-月）
+            departure_days = []
+            for index in results_df.index:
+                try:
+                    # 尝试解析年-月-日格式
+                    if '-' in index:
+                        parts = index.split('-')
+                        if len(parts) == 3:
+                            year, month, day = map(int, parts)
+                        else:
+                            # 旧格式：年-月
+                            year, month = map(int, parts)
+                            day = 1
+                        # 转换为天数（以2026年1月1日为基准）
+                        from datetime import datetime
+                        base_date = datetime(2026, 1, 1)
+                        current_date = datetime(year, month, day)
+                        days = (current_date - base_date).days
+                        departure_days.append(days)
+                    else:
+                        # 旧格式：纯年份
+                        year = float(index)
+                        days = (year - 2026) * 365.25
+                        departure_days.append(days)
+                except:
+                    departure_days.append(0.0)
+            
+            # 解析飞行时间（年）并转换为天
+            tof_years = np.array([float(col.strip('y')) for col in results_df.columns])
+            tof_days = tof_years * 365.25
+            
+            # 准备数据容器
+            X_dep = []  # 出发天数
+            Y_tof = []  # 飞行时间（天）
+            Z_dv = []   # ΔV值
+            
+            # 构建网格数据
+            for i, dep_day in enumerate(departure_days):
+                for j, tof in enumerate(tof_days):
+                    dv = results_df.iloc[i, j]
+                    if not np.isnan(dv):
+                        X_dep.append(dep_day)
+                        Y_tof.append(tof)
+                        Z_dv.append(dv)
+            
+            # 转换为numpy数组
+            X = np.array(X_dep)
+            Y = np.array(Y_tof)
+            Z = np.array(Z_dv)
+            
+            # 创建规则网格用于等高线
+            xi = np.linspace(X.min(), X.max(), 100)
+            yi = np.linspace(Y.min(), Y.max(), 100)
+            xi_grid, yi_grid = np.meshgrid(xi, yi)
+            
+            # 使用线性插值填充网格
+            zi_grid = griddata((X, Y), Z, (xi_grid, yi_grid), method='linear', fill_value=np.nan)
+            
+            # 清除之前的图形
+            if hasattr(self, 'porkchop_fig') and self.porkchop_fig:
+                plt.close(self.porkchop_fig)
+            if hasattr(self, 'porkchop_canvas') and self.porkchop_canvas:
+                try:
+                    self.porkchop_canvas.get_tk_widget().destroy()
+                except:
+                    pass
+            
+            # 创建图表
+            self.porkchop_fig = plt.figure(figsize=(10, 8), facecolor='#2d2d2d')
+            self.porkchop_fig.subplots_adjust(left=0.1, right=0.9, top=0.9, bottom=0.1)
+            ax = self.porkchop_fig.add_subplot(111)
+            
+            # 设置轴的背景色
+            ax.set_facecolor('#2d2d2d')
+            
+            # 创建颜色映射和归一化
+            cmap = cm.get_cmap('viridis')
+            vmin = np.percentile(Z, 5)  # 5%分位数
+            vmax = np.percentile(Z, 95)  # 95%分位数
+            levels = np.linspace(vmin, vmax, 15)  # 15个等高线级别
+            norm = colors.Normalize(vmin=vmin, vmax=vmax)
+            
+            # 绘制等高线填充图
+            contourf = ax.contourf(
+                xi_grid, yi_grid, zi_grid,
+                levels=levels,
+                cmap=cmap,
+                norm=norm,
+                alpha=0.85,
+                extend='both'
+            )
+            
+            # 绘制等高线
+            contour_lines = ax.contour(
+                xi_grid, yi_grid, zi_grid,
+                levels=levels,
+                colors='white',
+                linewidths=0.8,
+                alpha=0.6,
+                linestyles='-'
+            )
+            
+            # 添加等高线标签（ΔV数值）
+            ax.clabel(
+                contour_lines,
+                inline=True,
+                fontsize=9,
+                fmt='%1.1f',
+                colors='white',
+                inline_spacing=5
+            )
+            
+            # 添加颜色条
+            cbar = plt.colorbar(contourf, ax=ax, shrink=0.8, pad=0.02)
+            cbar.set_label('速度增量 ΔV (km/s)', fontsize=12, fontweight='bold', color='white')
+            cbar.ax.tick_params(labelsize=10, colors='white')
+            cbar.add_lines(contour_lines)  # 将等高线添加到颜色条
+            
+            # 设置坐标轴和刻度
+            ax.set_xlabel('出发时间', fontsize=14, fontweight='bold', color='white')
+            ax.set_ylabel('飞行时间 (天)', fontsize=14, fontweight='bold', color='white')
+            ax.set_title('发射窗口分析猪排图', 
+                         fontsize=16, fontweight='bold', pad=20, color='white')
+            
+            # 设置主要刻度
+            # X轴：出发时间（日期）
+            if len(departure_days) > 1:
+                # 生成合适的刻度
+                min_day = int(np.floor(X.min()))
+                max_day = int(np.ceil(X.max()))
+                # 生成日期刻度
+                x_ticks = []
+                x_labels = []
+                step = max(1, (max_day - min_day) // 6)  # 最多6个刻度
+                from datetime import datetime, timedelta
+                base_date = datetime(2026, 1, 1)
+                for day in range(min_day, max_day + 1, step):
+                    x_ticks.append(day)
+                    current_date = base_date + timedelta(days=day)
+                    x_labels.append(f'{current_date.year}-{current_date.month:02d}-{current_date.day:02d}')
+                ax.set_xticks(x_ticks)
+                ax.set_xticklabels(x_labels, rotation=45, color='white')
+            else:
+                # 只有一个数据点
+                ax.set_xticks([X[0]])
+                from datetime import datetime, timedelta
+                base_date = datetime(2026, 1, 1)
+                current_date = base_date + timedelta(days=int(X[0]))
+                ax.set_xticklabels([f'{current_date.year}-{current_date.month:02d}-{current_date.day:02d}'], color='white')
+            
+            # Y轴：飞行时间（天）
+            y_min = int(np.floor(Y.min()))
+            y_max = int(np.ceil(Y.max()))
+            step = max(1, (y_max - y_min) // 6)  # 最多6个刻度
+            y_ticks = np.arange(y_min, y_max + 1, step)
+            ax.set_yticks(y_ticks)
+            ax.set_yticklabels([str(int(y)) for y in y_ticks], color='white')
+            
+            # 设置坐标轴范围
+            ax.set_xlim([X.min() - 0.5, X.max() + 0.5])
+            ax.set_ylim([Y.min() - 0.2, Y.max() + 0.2])
+            
+            # 添加网格
+            ax.grid(True, which='major', alpha=0.2, linestyle='--', linewidth=0.5, color='gray')
+            
+            # 嵌入到tkinter
+            from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+            self.porkchop_canvas = FigureCanvasTkAgg(self.porkchop_fig, porkchop_frame)
+            self.porkchop_canvas.draw()
+            self.porkchop_canvas.get_tk_widget().pack(fill='both', expand=True)
+            
+            # 找到最小ΔV的位置
+            min_dv = Z.min()
+            min_idx = np.argmin(Z)
+            min_dep_day = X[min_idx]
+            min_tof = Y[min_idx]
+            
+            return min_dv, min_dep_day, min_tof
+            
+        except Exception as e:
+            print(f"绘制猪排图时出错: {e}")
+            # 出错时显示错误信息
+            self.porkchop_fig = plt.figure(figsize=(10, 8), facecolor='#2d2d2d')
+            ax = self.porkchop_fig.add_subplot(111)
+            ax.set_facecolor('#2d2d2d')
+            ax.set_title('猪排图绘制失败', color='white')
+            ax.text(0.5, 0.5, f'错误: {str(e)}', ha='center', va='center', color='white')
+            
+            from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+            self.porkchop_canvas = FigureCanvasTkAgg(self.porkchop_fig, porkchop_frame)
+            self.porkchop_canvas.draw()
+            self.porkchop_canvas.get_tk_widget().pack(fill='both', expand=True)
+            
+            return None, None, None
+
     def close_all(self):
         """关闭所有图形"""
         if self.fig:
@@ -502,3 +782,7 @@ class UIPlotter:
             plt.close(self.trajectory_fig)
         if self.thrust_fig:
             plt.close(self.thrust_fig)
+        if hasattr(self, 'porkchop_fig') and self.porkchop_fig:
+            plt.close(self.porkchop_fig)
+        if self.porkchop_solar_fig:
+            plt.close(self.porkchop_solar_fig)

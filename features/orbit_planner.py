@@ -115,8 +115,8 @@ class OrbitPlanner:
         :return: (is_valid, message)
         """
         # 验证年份
-        if start_year < 1900:
-            return False, "出发年份必须在1900以后"
+        if start_year < 1:
+            return False, "出发年份必须为正整数"
         
         # 验证月份
         if start_month < 1 or start_month > 12:
@@ -157,7 +157,7 @@ class OrbitPlanner:
         return True, "输入参数有效"
     
     def calculate_launch_window(self, departure_body, arrival_body, 
-                               start_year, end_year, step_years=1, 
+                               start_year, start_month=1, start_day=1, end_year=None, end_month=None, end_day=None, step_months=12, 
                                tof_range=(1, 10), tof_step=1, N=30):
         """
         计算发射窗口
@@ -165,8 +165,12 @@ class OrbitPlanner:
         :param departure_body: 出发星体名称
         :param arrival_body: 到达星体名称
         :param start_year: 起始年份
+        :param start_month: 起始月份（默认1）
+        :param start_day: 起始日（默认1）
         :param end_year: 结束年份
-        :param step_years: 年份步长（默认1）
+        :param end_month: 结束月份
+        :param end_day: 结束日（默认1）
+        :param step_months: 月份步长（默认12）
         :param tof_range: 飞行时间范围（默认(1, 10)）
         :param tof_step: 飞行时间步长（默认1）
         :param N: 网格数（默认30）
@@ -180,8 +184,12 @@ class OrbitPlanner:
         # 计算猪排图
         results_df = self.optimizer.compute_porchop_diagram(
             start_year=start_year,
+            start_month=start_month,
+            start_day=start_day,
             end_year=end_year,
-            step_years=step_years,
+            end_month=end_month,
+            end_day=end_day,
+            step_months=step_months,
             tof_range=tof_range,
             tof_step=tof_step,
             departure_body=departure_body,
