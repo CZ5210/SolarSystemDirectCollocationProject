@@ -434,6 +434,9 @@ class SolarSystem:
 
                     sel.annotation.set_text(info)
                     sel.annotation.get_bbox_patch().set(fc="lightgray", ec="black", alpha=0.8)
+                    # 设置指针（箭头）颜色为白色
+                    if hasattr(sel.annotation, 'arrow_patch'):
+                        sel.annotation.arrow_patch.set_color('white')
                 
 
 
@@ -501,6 +504,9 @@ class SolarSystem:
             sel.annotation.set_ha('left')
             sel.annotation.set_text(info)
             sel.annotation.get_bbox_patch().set(fc="lightgray", ec="black", alpha=0.8)
+            # 设置指针（箭头）颜色为白色
+            if hasattr(sel.annotation, 'arrow_patch'):
+                sel.annotation.arrow_patch.set_color('white')
         
         # 设置标题和标签
         time_str = f"{year}-{month:02d}-{day:02d}"
