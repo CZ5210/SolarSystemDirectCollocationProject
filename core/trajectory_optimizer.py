@@ -73,9 +73,9 @@ class TrajectoryOptimizer:
         states[6*N:9*N] = 0.0
         return states
     
-    def initial_guess_hohmann_3d(self, N, s0, sf, mu):
+    def initial_guess_elliptic_3d(self, N, s0, sf, mu):
         """
-        生成3D霍曼转移初始猜测
+        生成3D椭圆轨道初始猜测
         
         :param N: 网格数
         :param s0: 初始条件 [x0, y0, z0, vx0, vy0, vz0]
@@ -100,51 +100,103 @@ class TrajectoryOptimizer:
         r1_unit = np.array([x0, y0, z0]) / r1 if r1 > 0 else np.array([1, 0, 0])
         r2_unit = np.array([xf, yf, zf]) / r2 if r2 > 0 else np.array([1, 0, 0])
         
-        # 计算转移平面的法向量
-        cross_product = np.cross(r1_unit, r2_unit)
-        if np.linalg.norm(cross_product) > 1e-6:
-            normal = cross_product / np.linalg.norm(cross_product)
+        # 计算初始速度方向（用于确定轨道平面和运动方向）
+        v1 = np.array([vx0, vy0, vz0])
+        v1_mag = np.linalg.norm(v1)
+        if v1_mag > 1e-6:
+            v1_unit = v1 / v1_mag
         else:
-            # 如果两个向量共线，使用默认法向量
-            normal = np.array([0, 0, 1])
+            # 如果初始速度为零，使用默认方向
+            v1_unit = np.array([0, 1, 0])  # 假设切向方向
         
-        # 计算第二个正交向量
-        tangent = np.cross(r1_unit, normal)
+        # 计算轨道平面法向量（基于初始位置和速度方向）
+        # 角动量方向 h = r × v
+        h_vec = np.cross(r1_unit, v1_unit)
+        if np.linalg.norm(h_vec) > 1e-6:
+            normal = h_vec / np.linalg.norm(h_vec)
+        else:
+            # 如果共线，使用r1和r2的叉积
+            cross_product = np.cross(r1_unit, r2_unit)
+            if np.linalg.norm(cross_product) > 1e-6:
+                normal = cross_product / np.linalg.norm(cross_product)
+            else:
+                # 如果仍然共线，使用默认法向量
+                normal = np.array([0, 0, 1])
+        
+        # 计算初始切向方向（垂直于r1_unit且在轨道平面内）
+        # 确保切向方向与初始速度方向大致一致
+        tangent = np.cross(normal, r1_unit)
         tangent /= np.linalg.norm(tangent)
         
+        # 检查tangent方向是否与v1_unit大致一致（点积为正）
+        if np.dot(tangent, v1_unit) < 0:
+            # 如果方向相反，反转tangent
+            tangent = -tangent
+        
+        # 计算r1_unit和r2_unit之间的夹角
+        dot_product = np.dot(r1_unit, r2_unit)
+        dot_product = np.clip(dot_product, -1.0, 1.0)  # 避免浮点误差
+        delta_theta = np.arccos(dot_product)
+        
+        # 如果夹角很小（接近0），需要处理特殊情况
+        if delta_theta < 1e-6:
+            delta_theta = 1e-6
+        
         for i in range(N):
-            theta_k = np.pi * i / (N-1)  # 真近点角从0到π
+            # 插值因子
+            t = i / (N-1) if N > 1 else 0
+            
+            # 计算当前的真近点角（从0到delta_theta）
+            theta_k = delta_theta * t
+            
+            # 计算当前半径（椭圆轨道公式）
             r = a * (1 - e**2) / (1 + e * np.cos(theta_k))
             
-            # 在转移平面上计算位置
-            x_plane = r * np.cos(theta_k)
-            y_plane = r * np.sin(theta_k)
+            # 使用球面线性插值计算当前位置方向
+            # slerp公式: r_unit = (sin((1-t)*θ)/sin(θ))*r1_unit + (sin(t*θ)/sin(θ))*r2_unit
+            sin_theta = np.sin(delta_theta)
+            if sin_theta < 1e-6:
+                # 如果sin(θ)很小，退化为线性插值
+                r_unit = (1 - t) * r1_unit + t * r2_unit
+            else:
+                r_unit = (np.sin((1 - t) * delta_theta) / sin_theta) * r1_unit + \
+                         (np.sin(t * delta_theta) / sin_theta) * r2_unit
+            r_unit /= np.linalg.norm(r_unit)  # 确保单位向量
             
-            # 转换到3D空间
-            states[i] = x0 + x_plane * r1_unit[0] + y_plane * tangent[0]
-            states[N + i] = y0 + x_plane * r1_unit[1] + y_plane * tangent[1]
-            states[2*N + i] = z0 + x_plane * r1_unit[2] + y_plane * tangent[2]
+            # 当前位置
+            states[i] = r_unit[0] * r
+            states[N + i] = r_unit[1] * r
+            states[2*N + i] = r_unit[2] * r
             
             # 计算椭圆轨道速度
             p = a * (1 - e**2)
-            h = np.sqrt(mu * p)
-            vr = (mu / h) * e * np.sin(theta_k)
-            vtheta = (mu / h) * (1 + e * np.cos(theta_k))
+            h = np.sqrt(mu * p)  # 角动量大小
+            vr = (mu / h) * e * np.sin(theta_k)  # 径向速度
+            vtheta = (mu / h) * (1 + e * np.cos(theta_k))  # 横向速度大小
             
-            # 转换为笛卡尔速度
-            vx_plane = vr * np.cos(theta_k) - vtheta * np.sin(theta_k)
-            vy_plane = vr * np.sin(theta_k) + vtheta * np.cos(theta_k)
+            # 计算当前位置的切向方向（垂直于r_unit且在轨道平面内）
+            # e_theta = normal × r_unit
+            e_theta = np.cross(normal, r_unit)
+            e_theta /= np.linalg.norm(e_theta)
             
-            states[3*N + i] = vx_plane * r1_unit[0] + vy_plane * tangent[0]
-            states[4*N + i] = vx_plane * r1_unit[1] + vy_plane * tangent[1]
-            states[5*N + i] = vx_plane * r1_unit[2] + vy_plane * tangent[2]
+            # 确保e_theta方向与轨道运动方向一致（与初始tangent方向大致相同）
+            # 检查与初始tangent的点积
+            if np.dot(e_theta, tangent) < 0:
+                e_theta = -e_theta
+            
+            # 计算速度向量：径向分量 + 横向分量
+            v_vec = vr * r_unit + vtheta * e_theta
+            
+            states[3*N + i] = v_vec[0]
+            states[4*N + i] = v_vec[1]
+            states[5*N + i] = v_vec[2]
         
         # 控制输入初始化为零
         states[6*N:9*N] = 0.0
         return states
     
     def trapezoidal_collocation_3d(self, mu, x0, y0, z0, vx0, vy0, vz0, xf, yf, zf, vxf, vyf, vzf, 
-                                 TOF, N, rbound=0.5, thrust_limit=None):
+                                 TOF, N, rbound=0.5, thrust_limit=None, maxiter=50, guess_method='linear'):
         """
         使用梯形配点法求解3D轨迹优化问题
         
@@ -256,12 +308,21 @@ class TrajectoryOptimizer:
 
             return cons
 
-        # 增加优化监控函数
+        # 增加优化监控函数，记录历史最优解
         def callbackF(xk):
             if not hasattr(callbackF, "iter"):
                 callbackF.iter = 0  # 初始化计数器
+                callbackF.best_obj = float('inf')  # 初始化最优目标值
+                callbackF.best_xk = None  # 初始化最优解
             callbackF.iter += 1
-            print(f"迭代 {callbackF.iter} 次，目标值 = {objective(xk):.6f}")
+            current_obj = objective(xk)
+            # 隐藏第一次迭代的目标值
+            if callbackF.iter > 1:
+                print(f"迭代 {callbackF.iter-1} 次，目标值 = {current_obj:.6f}")
+                # 只在第二次迭代及以后更新历史最优解
+                if current_obj < callbackF.best_obj:
+                    callbackF.best_obj = current_obj
+                    callbackF.best_xk = xk.copy()
             return
 
         # 计算初始条件
@@ -272,10 +333,18 @@ class TrajectoryOptimizer:
         dt = TOF / N
 
         # 设置初始猜测
-        # 使用线性初始猜测
-        states = self.initial_guess_line_3d(N, s0, sf)
-        # 或者使用霍曼转移初始猜测
-        # states = self.initial_guess_hohmann_3d(N, s0, sf, mu)
+        if guess_method == 'linear':
+            # 使用线性初始猜测
+            states = self.initial_guess_line_3d(N, s0, sf)
+            print("使用线性初始猜测")
+        elif guess_method == 'elliptic':
+            # 使用椭圆轨道初始猜测
+            states = self.initial_guess_elliptic_3d(N, s0, sf, mu)
+            print("使用椭圆轨道初始猜测")
+        else:
+            # 默认使用线性初始猜测
+            states = self.initial_guess_line_3d(N, s0, sf)
+            print("使用线性初始猜测")
 
         # 定义约束条件字典
         cons1 = {'type': 'eq', 'fun': partial(equ_constraints, s0=s0, sf=sf, dt=dt)}
@@ -286,7 +355,20 @@ class TrajectoryOptimizer:
 
         # 使用SLSQP算法（局部优化）
         sol = minimize(objective, states, method='SLSQP', constraints=[cons1, cons2], 
-                      options={'disp': True, 'maxiter': 50, 'ftol': 1e-12}, tol=1e-5, callback=callbackF)
+                      options={'disp': True, 'maxiter': maxiter, 'ftol': 1e-12}, tol=1e-5, callback=callbackF)
+
+        # 检查是否有历史最优解，且比最终解更好
+        if hasattr(callbackF, 'best_xk') and callbackF.best_xk is not None:
+            final_obj = objective(sol.x)
+            if callbackF.best_obj < final_obj:
+                print(f"使用历史最优解，目标值: {callbackF.best_obj:.6f} (最终解目标值: {final_obj:.6f})")
+                return callbackF.best_xk
+            else:
+                print(f"使用最终解，目标值: {final_obj:.6f}")
+        else:
+            # 没有有效的历史最优解，使用最终解
+            final_obj = objective(sol.x)
+            print(f"使用最终解，目标值: {final_obj:.6f}")
 
         return sol.x
     
@@ -327,6 +409,7 @@ class TrajectoryOptimizer:
             - mu: 太阳引力常数 (AU^3/year^2)（默认4*pi^2）
             - rbound: 最小太阳距离 (AU)（默认0.1）
             - thrust_limit: 推力加速度限制 (m/s²)（默认None）
+            - maxiter: 最大迭代次数（默认50）
         :return: 速度增量 (km/s)
         """
         # 从params字典中获取参数，设置默认值
@@ -342,6 +425,8 @@ class TrajectoryOptimizer:
         mu = params.get('mu', 4 * np.pi * np.pi)  # 太阳引力常数 (AU^3/year^2)
         rbound = params.get('rbound', 0.1)  # 最小太阳距离 (AU)
         thrust_limit = params.get('thrust_limit', None)  # 推力限制
+        maxiter = params.get('maxiter', 50)  # 最大迭代次数
+        guess_method = params.get('guess_method', 'linear')  # 初始猜测方法
         
         # 计算出发日期的儒略日
         start_jd = self.solar_system.date_to_julian_day(start_year, start_month, start_day)
@@ -399,7 +484,7 @@ class TrajectoryOptimizer:
         solution = self.trapezoidal_collocation_3d(
             mu, x0, y0, z0, vx0, vy0, vz0, 
             xf, yf, zf, vxf, vyf, vzf, 
-            tof_years, N, rbound, thrust_limit
+            tof_years, N, rbound, thrust_limit, maxiter, guess_method
         )
         print("\n3D轨迹优化求解完成")
         

@@ -15,7 +15,7 @@ class OrbitPlanner:
     
     def plan_orbit(self, start_year, start_month, start_day, tof_years, 
                    departure_body, arrival_body, N=20, rbound=0.1, 
-                   thrust_limit=None, plot=True, output_dir="Output"):
+                   thrust_limit=None, maxiter=50, guess_method='linear', plot=True, output_dir="Output"):
         """
         规划轨道
         
@@ -62,7 +62,9 @@ class OrbitPlanner:
             'arrival_body': arrival_body,
             'N': N,
             'rbound': rbound,
-            'thrust_limit': thrust_limit
+            'thrust_limit': thrust_limit,
+            'maxiter': maxiter,
+            'guess_method': guess_method
         }
         
         # 计算轨迹

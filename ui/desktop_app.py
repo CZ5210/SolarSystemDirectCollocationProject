@@ -46,7 +46,7 @@ class DesktopApp:
     def __init__(self, root):
         self.root = root
         self.root.title("太阳系轨道设计工具")
-        self.root.geometry("1400x1000")
+        self.root.geometry("1400x1200")
         self.root.configure(bg="#2d2d2d")
         
         # 初始化所有属性（避免 AttributeError）
@@ -248,26 +248,35 @@ class DesktopApp:
         self.rbound_entry.grid(row=10, column=1, sticky=tk.W, pady=2)
 
         # 推力限制（可选）
-        ttk.Label(self.right_panel, text="推力限制 (m/s²):", style="Dark.TLabel").grid(row=11, column=0, sticky=tk.W, padx=(10, 5), pady=(10, 5))
+        ttk.Label(self.right_panel, text="推力限制 (m/s²):", style="Dark.TLabel").grid(row=11, column=0, sticky=tk.W, padx=(10, 5), pady=(5, 5))
         self.thrust_var = tk.StringVar(value="")
         self.thrust_entry = ttk.Entry(self.right_panel, textvariable=self.thrust_var, width=10)
-        self.thrust_entry.grid(row=11, column=1, sticky=tk.W, pady=(10, 5))
+        self.thrust_entry.grid(row=11, column=1, sticky=tk.W, pady=(5, 5))
+
+        # 最大迭代次数
+        ttk.Label(self.right_panel, text="最大迭代次数:", style="Dark.TLabel").grid(row=12, column=0, sticky=tk.W, padx=(10, 5), pady=(5, 5))
+        self.maxiter_var = tk.StringVar(value="50")
+        self.maxiter_entry = ttk.Entry(self.right_panel, textvariable=self.maxiter_var, width=10)
+        self.maxiter_entry.grid(row=12, column=1, sticky=tk.W, pady=(5, 5))
+
+        # 初始猜测方法
+        ttk.Label(self.right_panel, text="初始猜测方法:", style="Dark.TLabel").grid(row=13, column=0, sticky=tk.W, padx=(10, 5), pady=(10, 5))
+        self.guess_method_var = tk.StringVar(value="linear")
+        guess_frame = ttk.Frame(self.right_panel, style="Dark.TFrame")
+        guess_frame.grid(row=13, column=1, sticky=tk.W, pady=(10, 5))
+        ttk.Radiobutton(guess_frame, text="线性", variable=self.guess_method_var, value="linear", style="Dark.TRadiobutton").pack(side=tk.LEFT, padx=5)
+        ttk.Radiobutton(guess_frame, text="椭圆", variable=self.guess_method_var, value="elliptic", style="Dark.TRadiobutton").pack(side=tk.LEFT, padx=5)
 
         # 开始计算按钮
         self.calculate_button = ttk.Button(self.right_panel, text="开始计算", command=self.calculate_trajectory, style="Dark.TButton")
-        self.calculate_button.grid(row=12, column=0, columnspan=2, pady=20)
-
-        # 状态标签
-        self.status_var = tk.StringVar(value="")
-        self.status_label = ttk.Label(self.right_panel, textvariable=self.status_var, style="Dark.TLabel", foreground="lightgreen")
-        self.status_label.grid(row=13, column=0, columnspan=2, pady=5)
+        self.calculate_button.grid(row=14, column=0, columnspan=2, pady=20)
 
         # 输出日志面板
-        ttk.Label(self.right_panel, text="计算日志", font=('Arial', 10, 'bold'), style="Dark.TLabel").grid(row=14, column=0, columnspan=2, sticky=tk.W, pady=(10, 5))
+        ttk.Label(self.right_panel, text="计算日志", font=('Arial', 10, 'bold'), style="Dark.TLabel").grid(row=15, column=0, columnspan=2, sticky=tk.W, pady=(10, 5))
         
         # 日志面板框架
         self.log_frame = ttk.LabelFrame(self.right_panel, padding="5", style="Dark.TLabelframe")
-        self.log_frame.grid(row=15, column=0, columnspan=2, sticky=tk.NSEW, pady=5)
+        self.log_frame.grid(row=16, column=0, columnspan=2, sticky=tk.NSEW, pady=5)
         self.log_frame.grid_columnconfigure(0, weight=1)
         self.log_frame.grid_rowconfigure(0, weight=1)
         
@@ -283,7 +292,7 @@ class DesktopApp:
         # 日志折叠/展开按钮
         self.log_collapsed = False
         self.log_toggle_button = ttk.Button(self.right_panel, text="折叠日志", command=self.toggle_log, style="Dark.TButton")
-        self.log_toggle_button.grid(row=16, column=0, columnspan=2, pady=5)
+        self.log_toggle_button.grid(row=17, column=0, columnspan=2, pady=5)
 
         # 初始化行星列表（稍后在_init_core_module中填充）
         self.planet_list = []
@@ -417,14 +426,14 @@ class DesktopApp:
                 control.config(state=tk.DISABLED)
             except:
                 pass
-        self.status_var.set("核心模块加载失败，轨迹规划功能不可用")
+        print("核心模块加载失败，轨迹规划功能不可用")
 
     def calculate_trajectory(self):
         """计算轨迹按钮回调函数"""
-        # 先清除状态
-        self.status_var.set("正在计算...")
         # 清空日志
         self.log_text.delete(1.0, tk.END)
+        # 输出状态到日志
+        print("正在计算...")
         self.root.update_idletasks()
         
         try:
@@ -432,13 +441,20 @@ class DesktopApp:
             year = int(self.year_var.get())
             month = int(self.month_var.get())
             day = int(self.day_var.get())
-            tof_days = float(self.tof_days_var.get())
+            # 支持数学表达式计算
+            tof_days_str = self.tof_days_var.get().strip()
+            try:
+                tof_days = float(eval(tof_days_str))
+            except:
+                tof_days = 365  # 默认值
             departure = self.departure_var.get()
             arrival = self.arrival_var.get()
             N = int(self.N_var.get())
             rbound = float(self.rbound_var.get())
             thrust_str = self.thrust_var.get().strip()
             thrust_limit = float(thrust_str) if thrust_str else None
+            maxiter = int(self.maxiter_var.get())
+            guess_method = self.guess_method_var.get()
             
             # 转换飞行时间为年（orbit_planner使用年为单位）
             tof_years = tof_days / 365.25
@@ -452,7 +468,7 @@ class DesktopApp:
                 year, month, day, tof_years, departure, arrival
             )
             if not is_valid:
-                self.status_var.set(f"输入错误: {message}")
+                print(f"输入错误: {message}")
                 return
             
             # 定义计算函数（用于线程执行）
@@ -471,14 +487,16 @@ class DesktopApp:
                             N=N,
                             rbound=rbound,
                             thrust_limit=thrust_limit,
+                            maxiter=maxiter,
+                            guess_method=guess_method,
                             plot=False,  # 不弹出窗口
                             output_dir=OUTPUT_CONFIG["directory"]
                         )
                     
                     # 计算完成后更新UI（必须在主线程中执行）
                     def update_ui():
-                        # 显示结果
-                        self.status_var.set(f"计算完成！速度增量: {dv:.4f} km/s")
+                        # 显示结果到日志
+                        print(f"计算完成！速度增量: {dv:.4f} km/s")
                         
                         # 更新结果框架的关键数据
                         self.dv_var.set(f"ΔV: {dv:.4f} km/s")
@@ -498,7 +516,7 @@ class DesktopApp:
                     
                 except Exception as e:
                     def update_error():
-                        self.status_var.set(f"计算过程中出错: {e}")
+                        print(f"计算过程中出错: {e}")
                     self.root.after(0, update_error)
             
             # 启动线程执行计算
@@ -507,11 +525,11 @@ class DesktopApp:
             thread.start()
             
         except ValueError as e:
-            self.status_var.set(f"输入格式错误: {e}")
+            print(f"输入格式错误: {e}")
         except ImportError as e:
-            self.status_var.set(f"无法导入轨道规划模块: {e}")
+            print(f"无法导入轨道规划模块: {e}")
         except Exception as e:
-            self.status_var.set(f"计算过程中出错: {e}")
+            print(f"计算过程中出错: {e}")
 
     def _update_trajectory_plot(self, trajectory_data=None):
         """更新转移轨迹图（使用实际计算结果）"""
@@ -525,7 +543,12 @@ class DesktopApp:
             year = int(self.year_var.get())
             month = int(self.month_var.get())
             day = int(self.day_var.get())
-            tof_years = float(self.tof_days_var.get()) / 365.25
+            # 支持数学表达式计算
+            tof_days_str = self.tof_days_var.get().strip()
+            try:
+                tof_years = float(eval(tof_days_str)) / 365.25
+            except:
+                tof_years = 1.0  # 默认值
             departure = self.departure_var.get()
             arrival = self.arrival_var.get()
             
@@ -810,7 +833,12 @@ class DesktopApp:
             year = int(self.year_var.get())
             month = int(self.month_var.get())
             day = int(self.day_var.get())
-            tof_years = float(self.tof_days_var.get()) / 365.25
+            # 支持数学表达式计算
+            tof_days_str = self.tof_days_var.get().strip()
+            try:
+                tof_years = float(eval(tof_days_str)) / 365.25
+            except:
+                tof_years = 1.0  # 默认值
             departure = self.departure_var.get()
             arrival = self.arrival_var.get()
             
@@ -829,31 +857,67 @@ class DesktopApp:
             solution = np.loadtxt(file_name, delimiter=',')
             N = int(self.N_var.get())
             
+            # 提取位置数据
+            x = solution[0:N]  # X方向位置 (AU)
+            y = solution[N:2*N]  # Y方向位置 (AU)
+            z = solution[2*N:3*N]  # Z方向位置 (AU)
+            
+            # 提取速度数据
+            vx = solution[3*N:4*N]  # X方向速度
+            vy = solution[4*N:5*N]  # Y方向速度
+            vz = solution[5*N:6*N]  # Z方向速度
+            
             # 提取控制输入数据（推力）
             ux = solution[6*N:7*N]  # X方向推力
             uy = solution[7*N:8*N]  # Y方向推力
             uz = solution[8*N:9*N]  # Z方向推力
 
             # 将加速度从AU/year^2转换为m/s^2
-            ux = ux * (149597871 / ((365*24*3600)**2))*1000
-            uy = uy * (149597871 / ((365*24*3600)**2))*1000
-            uz = uz * (149597871 / ((365*24*3600)**2))*1000
+            ux = ux * (149597871 / ((365.25*24*3600)**2))*1000
+            uy = uy * (149597871 / ((365.25*24*3600)**2))*1000
+            uz = uz * (149597871 / ((365.25*24*3600)**2))*1000
             
             # 计算总推力
             thrust_mag = np.sqrt(ux**2 + uy**2 + uz**2)
-
-            # 将推力转化为m/s^2
             
+            # 计算速度大小（从AU/year转换为km/s）
+            vx_km_s = vx * 149597871 / (365.25*24*3600)
+            vy_km_s = vy * 149597871 / (365.25*24*3600)
+            vz_km_s = vz * 149597871 / (365.25*24*3600)
+            speed_mag = np.sqrt(vx_km_s**2 + vy_km_s**2 + vz_km_s**2)
+
             # 生成时间数据（天）
             tof_days = tof_years * 365.25
             t = np.linspace(0, tof_days, N)
+            
+            # 计算飞船与各星体之间的距离（AU）
+            if self.solar_system is None:
+                from core.solar_system import SolarSystem
+                self.solar_system = SolarSystem()
+            
+            distances = {}  # 存储每个星体的距离数组
+            import datetime
+            # 预先计算每个时间点的儒略日
+            jds = np.zeros(N)
+            for i in range(N):
+                current_date = datetime.date(year, month, day) + datetime.timedelta(days=t[i])
+                jds[i] = self.solar_system.date_to_julian_day(current_date.year, current_date.month, current_date.day)
+            # 计算每个星体的距离
+            for body_name in self.solar_system.bodies.keys():
+                body_distances = np.zeros(N)
+                for i in range(N):
+                    # 使用儒略日计算星体位置
+                    bx, by, bz = self.solar_system.calculate_body_position(body_name, julian_day=jds[i])
+                    # 计算距离
+                    body_distances[i] = np.sqrt((x[i] - bx)**2 + (y[i] - by)**2 + (z[i] - bz)**2)
+                distances[body_name] = body_distances
             
             # 计算最大推力加速度
             max_thrust_accel = np.max(thrust_mag)
             self.max_thrust_accel_var.set(f"最大推力加速度: {max_thrust_accel:.6f} m/s^2")
             
-            # 创建包含4个子图的图形（4行1列）
-            self.thrust_fig, self.thrust_axes = plt.subplots(4, 1, figsize=(6, 10))
+            # 创建包含6个子图的图形（6行1列）
+            self.thrust_fig, self.thrust_axes = plt.subplots(6, 1, figsize=(8, 14))
             self.thrust_fig.patch.set_facecolor('#2d2d2d')
             
             # 子图1：X方向推力
@@ -876,7 +940,7 @@ class DesktopApp:
             ax3 = self.thrust_axes[2]
             ax3.set_facecolor('#2d2d2d')
             ax3.plot(t, uz, 'b-', linewidth=2)
-            ax3.set_ylabel(r'推力 Z $m/s^2$', color='white')   
+            ax3.set_ylabel(r'推力 Z $m/s^2$', color='white')
             ax3.tick_params(colors='white')
             ax3.grid(True, alpha=0.3)
             
@@ -884,10 +948,55 @@ class DesktopApp:
             ax4 = self.thrust_axes[3]
             ax4.set_facecolor('#2d2d2d')
             ax4.plot(t, thrust_mag, 'm-', linewidth=2)
-            ax4.set_xlabel('时间 (天)', color='white')
             ax4.set_ylabel(r'总推力 $m/s^2$', color='white')
             ax4.tick_params(colors='white')
             ax4.grid(True, alpha=0.3)
+            
+            # 子图5：速度大小
+            ax5 = self.thrust_axes[4]
+            ax5.set_facecolor('#2d2d2d')
+            ax5.plot(t, speed_mag, 'c-', linewidth=2)
+            ax5.set_ylabel(r'速度大小 $km/s$', color='white')
+            ax5.tick_params(colors='white')
+            ax5.grid(True, alpha=0.3)
+            
+            # 添加参考速度线
+            max_speed = np.max(speed_mag)
+            
+            # 太阳系逃逸速度（地球轨道附近）约42.1 km/s
+            escape_velocity = 42.1
+            # 0.14光速
+            light_speed_014 = 0.14 * 299792  # 约41970 km/s
+            
+            # 只有当最大速度超过这些值时才绘制参考线
+            if max_speed > escape_velocity:
+                ax5.axhline(y=escape_velocity, color='y', linestyle='--', linewidth=1, label=f'太阳系逃逸速度: {escape_velocity} km/s')
+            
+            if max_speed > light_speed_014:
+                ax5.axhline(y=light_speed_014, color='r', linestyle='--', linewidth=1, label=f'0.14光速: {light_speed_014:.0f} km/s')
+            
+            # 添加图例
+            if max_speed > escape_velocity or max_speed > light_speed_014:
+                ax5.legend(loc='upper left', fontsize=8, facecolor='#2d2d2d', edgecolor='white', labelcolor='white')
+            
+            # 子图6：与各星体距离,如果不在1AU内,则不绘制该星体曲线
+            ax6 = self.thrust_axes[5]
+            ax6.set_facecolor('#2d2d2d')
+            # 绘制每条距离曲线,y轴对数缩放
+            for body_name in self.solar_system.bodies.keys():
+                # 如果距离在1AU内,则不绘制
+                if np.min(distances[body_name]) > 1.0:
+                    continue
+                # 绘制距离曲线
+                color = self.solar_system.bodies[body_name]['color']
+                ax6.plot(t, distances[body_name], color=color, linewidth=1, label=body_name)
+            ax6.set_xlabel('时间 (天)', color='white')
+            ax6.set_ylabel(r'距离 $AU$', color='white')
+            ax6.set_ylim(0,1)
+            ax6.tick_params(colors='white')
+            ax6.grid(True, alpha=0.3)
+
+            ax6.legend(loc='upper left',fontsize=8, facecolor='#2d2d2d', edgecolor='white', labelcolor='white')
             
             # 调整布局
             self.thrust_fig.tight_layout()
