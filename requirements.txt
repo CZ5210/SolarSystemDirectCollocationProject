@@ -1,0 +1,14 @@
+# 太阳系轨道设计工具依赖库
+
+# 核心依赖
+numpy
+matplotlib
+scipy
+
+# 其他依赖（Python标准库，无需单独安装）
+tkinter
+datetime
+threading
+queue
+os
+sys

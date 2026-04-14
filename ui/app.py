@@ -421,6 +421,17 @@ class App:
         """计算猪排图"""
         # 清空日志
         self.ui.log_text.delete(1.0, tk.END)
+        # 清理输出路径下的猪排图文件
+        import os
+        porkchop_output_dir = os.path.join("Output", "PorkChop")
+        if os.path.exists(porkchop_output_dir):
+            for file in os.listdir(porkchop_output_dir):
+                file_path = os.path.join(porkchop_output_dir, file)
+                try:
+                    if os.path.isfile(file_path):
+                        os.remove(file_path)
+                except Exception as e:
+                    print(f"清理文件时出错: {str(e)}")
         # 输出状态到日志
         print("正在计算猪排图...")
         self.root.update_idletasks()
